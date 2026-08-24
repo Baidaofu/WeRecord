@@ -74,9 +74,9 @@ public class AvatarRepository extends LifecyclePerceptiveRepository {
                         break;
                     }
                 }
-                //候选格式均未命中时，列出头像目录查找包含md5的文件（兼容未知命名格式）
+                //候选格式均未命中时，列出头像目录查找small_/middle_/large_前缀的文件（新版微信命名：small_<头像文件md5>，文件名与用户id无关）
                 if (!copied && (!avatarFile.exists() || avatarFile.length() == 0)) {
-                    scanAvatarDir(avatarDir, idMd5, backupAvatarPath);
+                    scanAvatarDir(avatarDir, backupAvatarPath);
                 }
             }
         } catch (ShellUtils.ShellException | IOException e) {
@@ -86,20 +86,27 @@ public class AvatarRepository extends LifecyclePerceptiveRepository {
     }
 
     /**
-     * 列出头像目录，找到文件名包含指定md5的文件并复制到本地（兼容新版微信未知的命名格式）
+     * 列出头像目录，查找新版微信的头像文件（small_/middle_/large_前缀，无扩展名，
+     * 文件名中的md5是头像图片的md5与用户id无关），复制到本地。
+     * 跳过占位文件small_avatar_no_url。
      */
-    private void scanAvatarDir(@NonNull String avatarDir, @NonNull String idMd5, @NonNull String backupAvatarPath)
+    private void scanAvatarDir(@NonNull String avatarDir, @NonNull String backupAvatarPath)
             throws ShellUtils.ShellException, IOException {
         CommandResult result = ShellUtils.sudo("ls", "-a", avatarDir);
         String stdout = result.getStdout();
         if (stdout == null) {
             return;
         }
-        for (String line : stdout.split("\n")) {
-            String name = line.trim();
-            if (name.length() > 0 && name.contains(idMd5)) {
-                ShellUtils.cp2dataIfExists(avatarDir + name, backupAvatarPath, true);
-                break;
+        String[] lines = stdout.split("\n");
+        //优先清晰度更高的尺寸
+        String[] prefixes = {"large_", "middle_", "small_"};
+        for (String prefix : prefixes) {
+            for (String line : lines) {
+                String name = line.trim();
+                if (name.startsWith(prefix) && !"small_avatar_no_url".equals(name)) {
+                    ShellUtils.cp2dataIfExists(avatarDir + name, backupAvatarPath, true);
+                    return;
+                }
             }
         }
     }
