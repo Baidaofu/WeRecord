@@ -68,6 +68,8 @@ public class DebugActivity extends BaseActivity {
             new DebugFunction("删除备份表", "删除数据库中的消息备份表，释放存储空间。", this::deleteBackupTable),
             new DebugFunction("显示环境信息", "显示当前运行环境、手机硬件与微信版本信息。", this::showEnvInfo),
             new DebugFunction("导出消息数据库", "将当前工作数据库（已解密）复制到外部存储，便于查看与分析。", this::exportDatabase),
+            new DebugFunction("导出联系人数据库", "仅导出rcontact联系人表为独立数据库到外部存储（文件更小，便于分析）。", this::exportContactsTable),
+            new DebugFunction("导出消息表", "仅导出message消息表为独立数据库到外部存储（文件更小，便于分析）。", this::exportMessageTable),
             new DebugFunction("备份消息数据库", "将微信原始数据库备份到应用私有目录，用于意外时还原。", this::backupMsgDatabase),
             new DebugFunction("还原消息数据库备份", "用备份覆盖还原微信原始数据库，会强制停止微信，操作前请谨慎。", this::restoreMsgDatabaseBackup),
             new DebugFunction("导出模板数据库", "将消息编辑模板数据库导出到外部存储。", this::exportTemplateDb),
@@ -154,6 +156,53 @@ public class DebugActivity extends BaseActivity {
                 });
             }
         }
+    }
+
+    /**
+     * 将指定表导出为独立的未加密数据库到外部存储
+     */
+    private void exportTableToExternal(String tableName, String fileName) {
+        if (!mEnv.initialized() || mEnv.getCurrentUser() == null) {
+            MasterToast.shortToast("环境未初始化");
+            return;
+        }
+        Dialog dialog = UiUtils.createProgress(this, R.string.please_wait);
+        dialog.show();
+        final String[] result = new String[1];
+        RxJavaUtils.complete(() -> {
+            String tar = android.os.Environment.getExternalStorageDirectory() + File.separator + fileName;
+            File tarFile = new File(tar);
+            //noinspection ResultOfMethodCallIgnored
+            tarFile.delete();
+            net.sqlcipher.database.SQLiteDatabase src = mEnv.getWorkerDatabase();
+            //创建未加密的独立数据库并复制指定表
+            src.execSQL("ATTACH DATABASE '" + tar + "' AS export_db KEY ''");
+            src.execSQL("CREATE TABLE export_db." + tableName + " AS SELECT * FROM main." + tableName);
+            src.execSQL("DETACH DATABASE export_db");
+            result[0] = tar;
+        }).subscribe(new RxJavaUtils.CompletableObservableAdapter() {
+            @Override
+            public void onComplete() {
+                super.onComplete();
+                dialog.dismiss();
+                UiUtils.toast("已导出到" + result[0]);
+            }
+
+            @Override
+            public void onError(@NotNull Throwable e) {
+                super.onError(e);
+                dialog.dismiss();
+                showError(e);
+            }
+        });
+    }
+
+    private void exportContactsTable() {
+        exportTableToExternal("rcontact", "werecord_contacts.db");
+    }
+
+    private void exportMessageTable() {
+        exportTableToExternal("message", "werecord_message.db");
     }
 
     private void simulateSysRecycle() {

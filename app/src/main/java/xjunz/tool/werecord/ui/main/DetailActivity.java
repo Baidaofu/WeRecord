@@ -19,6 +19,7 @@ import org.jetbrains.annotations.NotNull;
 
 import xjunz.tool.werecord.BuildConfig;
 import xjunz.tool.werecord.R;
+import xjunz.tool.werecord.App;
 import xjunz.tool.werecord.databinding.ActivityDetailBinding;
 import xjunz.tool.werecord.impl.DatabaseModifier;
 import xjunz.tool.werecord.impl.model.account.Contact;
@@ -93,10 +94,14 @@ public class DetailActivity extends RecycleAwareActivity implements PopupMenu.On
         DatabaseModifier modifier = getEnvironment().modifyDatabase();
         switch (id) {
             case R.id.item_delete_locally:
+                if (!App.config().isEditModeEnabled()) {
+                    MasterToast.shortToast(R.string.edit_mode_not_enabled);
+                    break;
+                }
                 RxJavaUtils.complete(() -> {
-                   /* if (modifier.deleteContactWithId(mData.id)) {
+                    if (modifier.deleteContactWithId(mData.id)) {
                         modifier.apply();
-                    }*/
+                    }
                 }).subscribe(new RxJavaUtils.CompletableObservableAdapter() {
                     @Override
                     public void onComplete() {
@@ -110,6 +115,38 @@ public class DetailActivity extends RecycleAwareActivity implements PopupMenu.On
                         UiUtils.showError(DetailActivity.this, e);
                     }
                 });
+                break;
+            case R.id.item_add_to_local_friends:
+                if (!App.config().isEditModeEnabled()) {
+                    MasterToast.shortToast(R.string.edit_mode_not_enabled);
+                    break;
+                }
+                RxJavaUtils.complete(() -> {
+                    modifier.addContactWithId(mData.id);
+                    modifier.apply();
+                }).subscribe(new RxJavaUtils.CompletableObservableAdapter() {
+                    @Override
+                    public void onComplete() {
+                        super.onComplete();
+                        MasterToast.shortToast("完成");
+                    }
+
+                    @Override
+                    public void onError(@NotNull Throwable e) {
+                        super.onError(e);
+                        UiUtils.showError(DetailActivity.this, e);
+                    }
+                });
+                break;
+            case R.id.item_export:
+                //导出该联系人的聊天记录
+                if (mData instanceof Talker) {
+                    Intent i = new Intent(this, MessageExportActivity.class);
+                    ExporterRegistry.getInstance().register(new MessageExporter((Talker) mData));
+                    startActivity(i);
+                } else {
+                    MasterToast.shortToast(R.string.none);
+                }
                 break;
             case R.id.item_mark_as_unread:
 
