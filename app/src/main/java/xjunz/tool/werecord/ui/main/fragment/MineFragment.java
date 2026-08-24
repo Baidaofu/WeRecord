@@ -217,8 +217,8 @@ public class MineFragment extends PageFragment {
     }
 
     public void getLatestVersion() {
+        //功能暂不可用：仅提示当前版本，不再跳转下载页
         MasterToast.longToast(getString(R.string.format_current_app_version, BuildConfig.VERSION_NAME));
-        ActivityUtils.safeViewUri(requireContext(), Constants.URL_APP_DOWNLOAD_PAGE);
     }
 
     public void showAppInfo() {
@@ -226,6 +226,7 @@ public class MineFragment extends PageFragment {
     }
 
     public void gotoFeedback(View view) {
-        ActivityUtils.feedbackAutoFallback(requireContext(), Environment.getBasicEnvInfo());
+        //功能暂不可用：不再跳转反馈页
+        MasterToast.shortToast(R.string.function_unavailable);
     }
 }

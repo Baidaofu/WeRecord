@@ -408,6 +408,7 @@
     <string name="message_restored">消息已还原</string>
     <string name="operation_cancelled">操作取消</string>
     <string name="support_me">支持作者</string>
+    <string name="function_unavailable">此功能暂不可用</string>
     <string name="app_info">应用信息</string>
     <string name="feedback_via">请选择反馈方式</string>
     <string name="feedback_via_group">群聊</string>
