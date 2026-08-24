@@ -18,9 +18,11 @@ import androidx.annotation.Nullable;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
+import java.io.IOException;
 
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.schedulers.Schedulers;
+import xjunz.tool.werecord.App;
 import xjunz.tool.werecord.R;
 import xjunz.tool.werecord.impl.Environment;
 import xjunz.tool.werecord.impl.model.account.User;
@@ -166,6 +168,11 @@ public class DebugActivity extends BaseActivity {
             MasterToast.shortToast("环境未初始化");
             return;
         }
+        //与导出解密数据库一致：需要编辑模式（工作数据库需以读写方式打开）
+        if (!App.config().isEditModeEnabled()) {
+            MasterToast.shortToast(R.string.edit_mode_not_enabled);
+            return;
+        }
         Dialog dialog = UiUtils.createProgress(this, R.string.please_wait);
         dialog.show();
         final String[] result = new String[1];
@@ -174,6 +181,10 @@ public class DebugActivity extends BaseActivity {
             File tmpFile = new File(getCacheDir(), fileName);
             //noinspection ResultOfMethodCallIgnored
             tmpFile.delete();
+            //sqlcipher的ATTACH不会自动创建文件，必须先创建空文件（与DatabaseExporter一致）
+            if (!tmpFile.createNewFile()) {
+                throw new IOException("无法创建临时文件: " + tmpFile.getAbsolutePath());
+            }
             String internal = tmpFile.getAbsolutePath();
             net.sqlcipher.database.SQLiteDatabase src = mEnv.getWorkerDatabase();
             //创建未加密的独立数据库，用sqlcipher_export复制指定表（与导出解密数据库同方案）
