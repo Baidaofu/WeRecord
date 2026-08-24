@@ -74,12 +74,14 @@ public class DebugActivity extends BaseActivity {
             new DebugFunction("导出消息表", "仅导出message消息表为独立数据库到外部存储（文件更小，便于分析）。", this::exportMessageTable),
             new DebugFunction("导出附件表", "仅导出appattach附件表（图片/文件/视频的CDN信息）为独立数据库到外部存储。", this::exportAppAttachTable),
             new DebugFunction("导出消息数据库", "将当前工作数据库（已解密）复制到外部存储，便于查看与分析。", this::exportDatabase),
+            //导出/删除配对
+            new DebugFunction("导出备份表", "导出消息备份表(MessageBackup)为独立数据库到外部存储。", this::exportBackupTable),
+            new DebugFunction("删除备份表", "删除数据库中的消息备份表(MessageBackup)，释放存储空间。", this::deleteBackupTable),
             new DebugFunction("导出模板数据库", "将消息编辑模板数据库导出到外部存储。", this::exportTemplateDb),
-            //删除（谨慎操作）
-            new DebugFunction("删除备份表", "删除数据库中的消息备份表，释放存储空间。", this::deleteBackupTable),
             new DebugFunction("删除模板数据库", "删除消息编辑模板数据库，模板功能可能因此异常，下次启动会重建。", this::deleteTemplateDb),
-            //备份/还原（危险操作）
+            //备份/删除/还原配对
             new DebugFunction("备份消息数据库", "将微信原始数据库备份到应用私有目录，用于意外时还原。", this::backupMsgDatabase),
+            new DebugFunction("删除消息数据库备份", "删除应用私有目录中的微信原始数据库备份文件。", this::deleteMsgDatabaseBackup),
             new DebugFunction("还原消息数据库备份", "用备份覆盖还原微信原始数据库，会强制停止微信，操作前请谨慎。", this::restoreMsgDatabaseBackup),
             //模拟（最后）
             new DebugFunction("模拟系统回收", "五秒后强制结束本应用进程，模拟系统回收场景。", this::simulateSysRecycle),
@@ -242,6 +244,48 @@ public class DebugActivity extends BaseActivity {
 
     private void exportAppAttachTable() {
         exportTableToExternal("appattach", "werecord_appattach.db");
+    }
+
+    private void exportBackupTable() {
+        try {
+            if (!Environment.getInstance().modifyDatabase().isMessageBackupTableExists()) {
+                MasterToast.shortToast("消息备份表不存在");
+                return;
+            }
+        } catch (Exception e) {
+            MasterToast.shortToast("消息备份表不存在");
+            return;
+        }
+        exportTableToExternal("MessageBackup", "werecord_message_backup.db");
+    }
+
+    private void deleteMsgDatabaseBackup() {
+        User user = getEnvironment().getCurrentUser();
+        if (user == null || user.backupDatabaseFilePath == null) {
+            MasterToast.shortToast("备份不存在");
+            return;
+        }
+        File backup = new File(user.backupDatabaseFilePath);
+        if (!backup.exists()) {
+            MasterToast.shortToast("备份不存在");
+            return;
+        }
+        RxJavaUtils.complete(() -> {
+            //noinspection ResultOfMethodCallIgnored
+            backup.delete();
+        }).subscribe(new RxJavaUtils.CompletableObservableAdapter() {
+            @Override
+            public void onComplete() {
+                super.onComplete();
+                MasterToast.shortToast("已删除");
+            }
+
+            @Override
+            public void onError(@NotNull Throwable e) {
+                super.onError(e);
+                showError(e);
+            }
+        });
     }
 
     private void simulateSysRecycle() {
