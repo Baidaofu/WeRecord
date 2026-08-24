@@ -18,29 +18,33 @@ jobs:
           distribution: temurin
           java-version: '11'
 
-      - name: Diagnose preinstalled Android SDK
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls "$ANDROID_HOME" 2>/dev/null || echo "no ANDROID_HOME content"
-          echo "--- platforms ---"
-          ls "$ANDROID_HOME/platforms" 2>/dev/null
-          echo "--- build-tools ---"
-          ls "$ANDROID_HOME/build-tools" 2>/dev/null
-          echo "--- cmdline-tools ---"
-          ls "$ANDROID_HOME/cmdline-tools" 2>/dev/null
-          echo "--- licenses ---"
-          ls "$ANDROID_HOME/licenses" 2>/dev/null
-          echo "--- java ---"
-          java -version 2>&1
-
       - name: Build debug APK
+        id: build
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          set +e
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Upload full build log (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: gradle-build.log
+          if-no-files-found: warn
 
       - name: Upload APK artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: werecord-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      - name: Paste tail of build log (if failed)
+        if: failure()
+        run: |
+          tail -n 400 gradle-build.log > /tmp/log-tail.txt
+          echo "=== uploading log tail to paste.rs ==="
+          curl -s --data-binary @/tmp/log-tail.txt https://paste.rs
