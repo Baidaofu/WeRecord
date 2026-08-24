@@ -120,6 +120,13 @@ public class MineFragment extends PageFragment {
         }
     }
 
+    /**
+     * 切换图片/表情预览开关（试验功能）
+     */
+    public void toggleImagePreview() {
+        mSettings.imagePreview.toggleValue();
+    }
+
     public void showSwitchAccountDialog() {
         if (Environment.getInstance().getUserList().size() < 2) {
             MasterToast.shortToast(R.string.no_candidate_account);

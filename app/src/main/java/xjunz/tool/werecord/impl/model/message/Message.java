@@ -519,10 +519,14 @@ public abstract class Message implements Parcelable, Exportable {
     }
 
     /**
-     * @return 图片/表情的候选缓存路径列表（依次尝试），无则返回空数组
+     * @return 图片/表情的候选缓存路径列表（依次尝试），无则返回空数组。
+     * 受设置中“图片/表情预览”开关控制，默认关闭（返回空，不尝试加载）
      */
     @NonNull
     public String[] getImageCandidatePaths() {
+        if (!App.config().isImagePreviewEnabled()) {
+            return new String[0];
+        }
         List<String> candidates = new ArrayList<>();
         String fromImgPath = getLocalImagePath();
         if (fromImgPath != null) {

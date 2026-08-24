@@ -128,6 +128,18 @@
                 <xjunz.tool.werecord.ui.customview.OptionItemView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:checked="@{settings.imagePreview.value}"
+                    android:elevation="@dimen/z_item"
+                    android:onClick="@{()->host.toggleImagePreview()}"
+                    app:optionDes="@string/des_image_preview"
+                    app:optionIcon="@drawable/ic_baseline_eye_24"
+                    app:optionShowSwitch="true"
+                    app:optionShowTopDivider="true"
+                    app:optionTitle="@string/enable_image_preview" />
+
+                <xjunz.tool.werecord.ui.customview.OptionItemView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
                     android:checked="@{settings.verifyDeviceCredential.value}"
                     android:elevation="@dimen/z_item"
                     android:onClick="@{()->host.toggleEnableVerifyDeviceCredential()}"

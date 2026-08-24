@@ -74,12 +74,6 @@ public class AppMessage extends ComplexMessage {
 
     @Nullable
     @Override
-    public String getDescription() {
-        return mDes;
-    }
-
-    @Nullable
-    @Override
     public String getCaption() {
         return getSource();
     }
@@ -149,6 +143,18 @@ public class AppMessage extends ComplexMessage {
                 this.parseErrorCode = PARSE_ERROR_APP_XML;
             }
         }
+    }
+
+    @Nullable
+    @Override
+    public String getDescription() {
+        String base = mDes;
+        if (mReferContent != null && mReferContent.length() > 0) {
+            //附加被引用消息内容，使气泡的description区域显示引用块
+            String quote = (mReferSender == null || mReferSender.length() == 0 ? "" : mReferSender + "：") + mReferContent;
+            return base == null || base.length() == 0 ? "引用 " + quote : base + "\n引用 " + quote;
+        }
+        return base;
     }
 
     /**

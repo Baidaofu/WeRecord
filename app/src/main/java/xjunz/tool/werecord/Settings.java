@@ -17,6 +17,10 @@ public class Settings {
     private final SharedPreferences mSP;
     public SwitchSetting verifyDeviceCredential = new SwitchSetting("verify_device_credential", true);
     public SwitchSetting editMode = new SwitchSetting("edit_mode", false);
+    /**
+     * 图片/表情预览开关（试验功能，默认关闭）
+     */
+    public SwitchSetting imagePreview = new SwitchSetting("image_preview", false);
     public StringSetting lastUsedUin = new StringSetting("last_used_uin", null);
 
     Settings(SharedPreferences sp) {
@@ -29,6 +33,10 @@ public class Settings {
 
     public boolean isEditModeEnabled() {
         return editMode.getValue();
+    }
+
+    public boolean isImagePreviewEnabled() {
+        return imagePreview.getValue();
     }
 
     public static abstract class Setting<T> extends BaseObservable {

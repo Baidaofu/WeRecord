@@ -365,6 +365,8 @@
     <string name="des_verify_owner">启用后需要验证机主身份才能运行此应用</string>
     <string name="enable_edit_mode">编辑模式</string>
     <string name="des_edit_mode">启用后可以使用需要修改数据的功能</string>
+    <string name="enable_image_preview">图片/表情预览</string>
+    <string name="des_image_preview">预览图片与表情消息（试验功能，未完成，可能无法正常显示）</string>
     <string name="unable_to_verify_device_credential">无法确认机主身份</string>
     <string name="verify_owner_title">身份验证</string>
     <string name="verify_owner_des">确认机主身份后才能继续使用微记录</string>
