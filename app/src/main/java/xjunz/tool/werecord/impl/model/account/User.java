@@ -34,6 +34,7 @@ public class User extends Account {
     public String databasePassword;
     public final String imageCachePath;
     public final String videoCachePath;
+    public final String emojiCachePath;
     public boolean isLastLogin;
     public String uin;
     public String phoneNum;
@@ -48,6 +49,8 @@ public class User extends Account {
                 + File.separator + "MicroMsg" + File.separator + pathIdentifier + File.separator + "image2";
         this.videoCachePath = android.os.Environment.getExternalStorageDirectory().getPath() + File.separator + "tencent"
                 + File.separator + "MicroMsg" + File.separator + pathIdentifier + File.separator + "video";
+        this.emojiCachePath = android.os.Environment.getExternalStorageDirectory().getPath() + File.separator + "tencent"
+                + File.separator + "MicroMsg" + File.separator + pathIdentifier + File.separator + "emoji";
     }
 
     public void deleteWorkerDatabase() {
@@ -98,6 +101,7 @@ public class User extends Account {
         dest.writeString(this.databasePassword);
         dest.writeString(this.imageCachePath);
         dest.writeString(this.videoCachePath);
+        dest.writeString(this.emojiCachePath);
         dest.writeByte(this.isLastLogin ? (byte) 1 : (byte) 0);
         dest.writeString(this.uin);
     }
@@ -111,6 +115,7 @@ public class User extends Account {
         this.databasePassword = in.readString();
         this.imageCachePath = in.readString();
         this.videoCachePath = in.readString();
+        this.emojiCachePath = in.readString();
         this.isLastLogin = in.readByte() != 0;
         this.uin = in.readString();
     }

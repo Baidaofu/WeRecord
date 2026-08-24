@@ -26,6 +26,8 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 import xjunz.tool.werecord.App;
+import xjunz.tool.werecord.impl.model.account.Contact;
+import xjunz.tool.werecord.impl.repo.ContactRepository;
 import xjunz.tool.werecord.impl.repo.RepositoryFactory;
 import xjunz.tool.werecord.impl.repo.WxAppRepository;
 
@@ -185,6 +187,7 @@ public class AppMessage extends ComplexMessage {
         private String referCurrent;
         private final StringBuilder referContent = new StringBuilder();
         private final StringBuilder referSender = new StringBuilder();
+        private final StringBuilder referFallback = new StringBuilder();
 
         @Override
         public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
@@ -197,8 +200,10 @@ public class AppMessage extends ComplexMessage {
                 inReferMsg = true;
             } else if (inReferMsg && Objects.equals(localName, "content")) {
                 referCurrent = "content";
-            } else if (inReferMsg && (Objects.equals(localName, "displayname") || Objects.equals(localName, "chatusr"))) {
+            } else if (inReferMsg && Objects.equals(localName, "displayname")) {
                 referCurrent = "sender";
+            } else if (inReferMsg && (Objects.equals(localName, "chatusr") || Objects.equals(localName, "fromusr"))) {
+                referCurrent = "senderFallback";
             }
         }
 
@@ -240,13 +245,22 @@ public class AppMessage extends ComplexMessage {
                 case "refermsg":
                     inReferMsg = false;
                     mReferContent = referContent.length() == 0 ? null : referContent.toString();
-                    mReferSender = referSender.length() == 0 ? null : referSender.toString();
+                    String displayName = referSender.length() == 0 ? null : referSender.toString();
+                    if (displayName == null && referFallback.length() > 0) {
+                        //displayname缺失时，用fromusr/chatusr解析发送者名字
+                        String wxid = referFallback.toString();
+                        ContactRepository repo = RepositoryFactory.get(ContactRepository.class);
+                        Contact contact = repo.get(wxid);
+                        displayName = contact == null ? wxid : contact.getName();
+                    }
+                    mReferSender = displayName;
                     break;
                 case "content":
                     referCurrent = null;
                     break;
                 case "displayname":
                 case "chatusr":
+                case "fromusr":
                     if (inReferMsg) {
                         referCurrent = null;
                     }
@@ -271,6 +285,8 @@ public class AppMessage extends ComplexMessage {
                     referContent.append(ch, start, length);
                 } else if ("sender".equals(referCurrent)) {
                     referSender.append(ch, start, length);
+                } else if ("senderFallback".equals(referCurrent)) {
+                    referFallback.append(ch, start, length);
                 }
                 return;
             }

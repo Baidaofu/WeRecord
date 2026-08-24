@@ -56,19 +56,19 @@ public class UniversalBindingAdapter {
      */
     @BindingAdapter(value = {"android:msgImage"})
     public static void setMsgImage(@NotNull ImageView imageView, Message oldMessage, Message message) {
-        String path = message == null ? null : message.getLocalImagePath();
-        if (path == null) {
+        String[] paths = message == null ? null : message.getImageCandidatePaths();
+        if (paths == null || paths.length == 0) {
             imageView.setVisibility(View.GONE);
             imageView.setImageDrawable(null);
             return;
         }
         imageView.setVisibility(View.VISIBLE);
-        imageView.setTag(path);
-        RxJavaUtils.maybe(() -> MessageImageLoader.load(path)).subscribeOn(Schedulers.io())
+        imageView.setTag(paths);
+        RxJavaUtils.maybe(() -> MessageImageLoader.loadAny(paths)).subscribeOn(Schedulers.io())
                 .subscribe(new RxJavaUtils.MaybeObserverAdapter<Bitmap>() {
                     @Override
                     public void onSuccess(@NotNull Bitmap bitmap) {
-                        if (path.equals(imageView.getTag())) {
+                        if (paths == imageView.getTag()) {
                             imageView.setImageBitmap(bitmap);
                         }
                     }
@@ -76,7 +76,7 @@ public class UniversalBindingAdapter {
                     @Override
                     public void onComplete() {
                         //加载失败（如微信缓存已被清理），隐藏图片
-                        if (path.equals(imageView.getTag())) {
+                        if (paths == imageView.getTag()) {
                             imageView.setImageDrawable(null);
                             imageView.setVisibility(View.GONE);
                         }

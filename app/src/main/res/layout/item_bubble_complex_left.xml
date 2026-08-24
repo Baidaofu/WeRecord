@@ -109,7 +109,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/dp_4"
-                    android:gone="@{TextUtils.isEmpty(msg.title) || msg.localImagePath != null}"
+                    android:gone="@{TextUtils.isEmpty(msg.title) || msg.imageCandidatePaths.length > 0}"
                     android:text="@{msg.title}"
                     android:textAppearance="@style/TextAppearance.AppCompat.Subhead"
                     app:layout_constraintStart_toStartOf="parent"

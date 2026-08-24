@@ -7,6 +7,8 @@ package xjunz.tool.werecord.util;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
+import androidx.annotation.Nullable;
+
 import org.apaches.commons.codec.digest.DigestUtils;
 
 import java.io.File;
@@ -21,6 +23,23 @@ import xjunz.tool.werecord.App;
  */
 public class MessageImageLoader {
     private static final String CACHE_DIR_NAME = "msg_img_cache";
+
+    /**
+     * 依次尝试候选路径，返回第一个成功加载的位图
+     */
+    @Nullable
+    public static Bitmap loadAny(@Nullable String[] paths) {
+        if (paths == null) {
+            return null;
+        }
+        for (String path : paths) {
+            Bitmap bitmap = load(path);
+            if (bitmap != null) {
+                return bitmap;
+            }
+        }
+        return null;
+    }
 
     /**
      * 加载指定路径的图片，缓存于应用私有目录。

@@ -15,7 +15,11 @@ import androidx.annotation.Nullable;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import xjunz.tool.werecord.App;
 import xjunz.tool.werecord.impl.Environment;
@@ -488,6 +492,55 @@ public abstract class Message implements Parcelable, Exportable {
             }
         }
         return localImagePath;
+    }
+
+    private static final Pattern IMG_MD5_PATTERN = Pattern.compile("md5=\"([0-9a-fA-F]{32})\"");
+    private static final Pattern EMOJI_MD5_PATTERN = Pattern.compile("^[^:]*:[^:]*:[^:]*:([0-9a-fA-F]{32})::0$");
+
+    /**
+     * 从消息content中提取图片或表情的md5：
+     * 图片XML形如&lt;msg&gt;&lt;img md5="..." ...&gt;；
+     * 表情文本形如wxid:timestamp:1:md5::0
+     */
+    @Nullable
+    private String extractMediaMd5FromContent() {
+        if (content == null) {
+            return null;
+        }
+        Matcher imgMatcher = IMG_MD5_PATTERN.matcher(content);
+        if (imgMatcher.find()) {
+            return imgMatcher.group(1);
+        }
+        Matcher emojiMatcher = EMOJI_MD5_PATTERN.matcher(content.trim());
+        if (emojiMatcher.find()) {
+            return emojiMatcher.group(1);
+        }
+        return null;
+    }
+
+    /**
+     * @return 图片/表情的候选缓存路径列表（依次尝试），无则返回空数组
+     */
+    @NonNull
+    public String[] getImageCandidatePaths() {
+        List<String> candidates = new ArrayList<>();
+        String fromImgPath = getLocalImagePath();
+        if (fromImgPath != null) {
+            candidates.add(fromImgPath);
+        }
+        String md5 = extractMediaMd5FromContent();
+        if (md5 != null && md5.length() >= 4) {
+            User user = getCurrentUser();
+            String base = user.imageCachePath + File.separator + md5.substring(0, 2) + File.separator + md5.substring(2, 4);
+            //缩略图与原图
+            candidates.add(base + File.separator + "th_" + md5);
+            candidates.add(base + File.separator + md5);
+            //表情目录
+            String emoji = user.emojiCachePath + File.separator + md5;
+            candidates.add(emoji);
+            candidates.add(emoji + ".gif");
+        }
+        return candidates.toArray(new String[0]);
     }
 
     public String getRawContent() {
