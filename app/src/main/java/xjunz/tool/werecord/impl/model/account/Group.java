@@ -29,6 +29,10 @@ public class Group extends Contact {
      * 成员数量
      */
     public int memberCount;
+    /**
+     * 群成员详情（含成员在群内的昵称），格式为XML或protobuf，按微信版本而定
+     */
+    public String roomData;
 
     public Group(String id) {
         super(id);
@@ -61,6 +65,7 @@ public class Group extends Contact {
         dest.writeString(this.memberDisplayName);
         dest.writeString(this.groupOwnerId);
         dest.writeInt(this.memberCount);
+        dest.writeString(this.roomData);
     }
 
     protected Group(Parcel in) {
@@ -69,6 +74,7 @@ public class Group extends Contact {
         this.memberDisplayName = in.readString();
         this.groupOwnerId = in.readString();
         this.memberCount = in.readInt();
+        this.roomData = in.readString();
     }
 
     @Override

@@ -143,7 +143,18 @@ public class AdvancedEditorFragment extends EditorFragment {
         @Bindable("value")
         @Nullable
         public String getContentPreview() {
-            return value == null ? null : value instanceof byte[] ? Arrays.toString((byte[]) value) : value.toString();
+            if (value == null) {
+                return null;
+            }
+            if (value instanceof byte[]) {
+                return Arrays.toString((byte[]) value);
+            }
+            if (Message.KEY_CONTENT.equals(key) && value instanceof String && ((String) value).contains("<patMsg>")) {
+                //拍一拍消息显示解析后的友好文本，而非原始XML
+                String parsed = mVictim.getParsedContent();
+                return parsed == null ? value.toString() : parsed;
+            }
+            return value.toString();
         }
 
         public void setValue(Object newValue) {

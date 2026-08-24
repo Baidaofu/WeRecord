@@ -29,6 +29,7 @@ import javax.xml.parsers.SAXParserFactory;
 import xjunz.tool.werecord.impl.model.account.Contact;
 import xjunz.tool.werecord.impl.model.account.User;
 import xjunz.tool.werecord.impl.repo.ContactRepository;
+import xjunz.tool.werecord.impl.repo.GroupRepository;
 import xjunz.tool.werecord.impl.repo.RepositoryFactory;
 import xjunz.tool.werecord.util.Utils;
 
@@ -440,7 +441,7 @@ public class SystemMessage extends Message {
         }
 
         /**
-         * 将wxid解析为可显示的名字，查不到时保留wxid原文
+         * 将wxid解析为可显示的名字，查不到时尝试从群信息解析群昵称，仍无则保留wxid原文
          */
         private String resolveName(String wxid) {
             if (wxid == null || wxid.length() == 0) {
@@ -450,7 +451,31 @@ public class SystemMessage extends Message {
             if (contact != null) {
                 return contact.getName();
             }
+            //查不到联系人时，尝试从消息所在群的roomdata解析群昵称（群成员可能不在通讯录）
+            String groupNick = resolveGroupNickName(wxid);
+            if (groupNick != null && groupNick.length() > 0) {
+                return groupNick;
+            }
             return wxid;
+        }
+
+        /**
+         * 从消息所在群的chatroom.roomdata解析成员在群内的昵称
+         */
+        private String resolveGroupNickName(String wxid) {
+            try {
+                String talker = getTalkerId();
+                if (talker != null && talker.endsWith("@chatroom")) {
+                    GroupRepository groupRepository = RepositoryFactory.get(GroupRepository.class);
+                    String name = groupRepository.getMemberNickName(talker, wxid);
+                    if (name != null && name.length() > 0) {
+                        return name;
+                    }
+                }
+            } catch (Exception ignored) {
+                //群信息查询失败时忽略，回退到wxid
+            }
+            return null;
         }
     }
 
