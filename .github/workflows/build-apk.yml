@@ -26,7 +26,8 @@ jobs:
           # 但代码仍有引用，构建前从历史恢复
           git show b95a229^:app/src/main/java/xjunz/tool/werecord/Constants.java > app/src/main/java/xjunz/tool/werecord/Constants.java
           git show b95a229^:app/src/main/java/xjunz/tool/werecord/ui/outer/DebugActivity.java > app/src/main/java/xjunz/tool/werecord/ui/outer/DebugActivity.java
-          ls -la app/src/main/java/xjunz/tool/werecord/Constants.java app/src/main/java/xjunz/tool/werecord/ui/outer/DebugActivity.java
+          git show b95a229^:app/src/main/assets/declaration.html > app/src/main/assets/declaration.html
+          ls -la app/src/main/java/xjunz/tool/werecord/Constants.java app/src/main/java/xjunz/tool/werecord/ui/outer/DebugActivity.java app/src/main/assets/declaration.html
 
       - name: Build debug APK
         id: build
