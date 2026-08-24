@@ -250,7 +250,44 @@ public class AdvancedEditorFragment extends EditorFragment {
                 ItemAdvancedEditorBinding advancedEditorBinding = (ItemAdvancedEditorBinding) binding;
                 this.itemView.setOnClickListener(this);
                 advancedEditorBinding.btnReset.setOnClickListener(this);
+                //长按复制属性标题/内容
+                this.itemView.setOnLongClickListener(v -> {
+                    EditorItem item = mEditorItems.get(getAdapterPosition());
+                    if (item != null) {
+                        showCopyDialog(item.getKey(), item.getContentPreview());
+                    }
+                    return true;
+                });
             }
+        }
+
+        /**
+         * 长按属性项时弹出复制选项：复制标题、复制内容、复制“标题: 内容”
+         */
+        private void showCopyDialog(@NonNull String key, @Nullable String value) {
+            final String caption = key;
+            final String content = value == null ? "" : value;
+            new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                    .setTitle(caption)
+                    .setItems(new String[]{
+                            getString(R.string.copy_title),
+                            getString(R.string.copy_content),
+                            getString(R.string.copy_title_and_content)
+                    }, (dialog, which) -> {
+                        switch (which) {
+                            case 0:
+                                Utils.copyPlainText(caption, caption);
+                                break;
+                            case 1:
+                                Utils.copyPlainText(caption, content);
+                                break;
+                            default:
+                                Utils.copyPlainText(caption, caption + ": " + content);
+                                break;
+                        }
+                        MasterToast.shortToast(R.string.has_copied_to_clipboard);
+                    })
+                    .show();
         }
 
         @Override

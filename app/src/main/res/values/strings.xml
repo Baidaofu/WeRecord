@@ -166,6 +166,9 @@
     <string name="check">查看</string>
     <string name="has_reached_the_top">到顶啦</string>
     <string name="has_copied_to_clipboard">已复制到剪贴板</string>
+    <string name="copy_title">复制标题</string>
+    <string name="copy_content">复制内容</string>
+    <string name="copy_title_and_content">复制“标题: 内容”</string>
     <string name="tn_message_list">tn_message_list</string>
     <string name="restore">还原</string>
     <string name="unpreviewable">暂不支持预览</string>
