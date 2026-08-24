@@ -18,8 +18,20 @@ jobs:
           distribution: temurin
           java-version: '11'
 
-      - name: Setup Android SDK (accept licenses)
-        uses: android-actions/setup-android@v3
+      - name: Diagnose preinstalled Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME" 2>/dev/null || echo "no ANDROID_HOME content"
+          echo "--- platforms ---"
+          ls "$ANDROID_HOME/platforms" 2>/dev/null
+          echo "--- build-tools ---"
+          ls "$ANDROID_HOME/build-tools" 2>/dev/null
+          echo "--- cmdline-tools ---"
+          ls "$ANDROID_HOME/cmdline-tools" 2>/dev/null
+          echo "--- licenses ---"
+          ls "$ANDROID_HOME/licenses" 2>/dev/null
+          echo "--- java ---"
+          java -version 2>&1
 
       - name: Build debug APK
         run: |
