@@ -72,6 +72,7 @@ public class DebugActivity extends BaseActivity {
             //导出（只读，安全）
             new DebugFunction("导出联系人数据库", "仅导出rcontact联系人表为独立数据库到外部存储（文件更小，便于分析）。", this::exportContactsTable),
             new DebugFunction("导出消息表", "仅导出message消息表为独立数据库到外部存储（文件更小，便于分析）。", this::exportMessageTable),
+            new DebugFunction("导出附件表", "仅导出appattach附件表（图片/文件/视频的CDN信息）为独立数据库到外部存储。", this::exportAppAttachTable),
             new DebugFunction("导出消息数据库", "将当前工作数据库（已解密）复制到外部存储，便于查看与分析。", this::exportDatabase),
             new DebugFunction("导出模板数据库", "将消息编辑模板数据库导出到外部存储。", this::exportTemplateDb),
             //删除（谨慎操作）
@@ -237,6 +238,10 @@ public class DebugActivity extends BaseActivity {
 
     private void exportMessageTable() {
         exportTableToExternal("message", "werecord_message.db");
+    }
+
+    private void exportAppAttachTable() {
+        exportTableToExternal("appattach", "werecord_appattach.db");
     }
 
     private void simulateSysRecycle() {
