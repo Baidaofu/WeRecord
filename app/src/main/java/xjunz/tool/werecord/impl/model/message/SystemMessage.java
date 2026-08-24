@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
@@ -72,7 +74,10 @@ public class SystemMessage extends Message {
     @Override
     public String getParsedContent() {
         if (parsedContent == null) {
-            if (isPatMsgContent(content)) {
+            if (isRevokeMsgContent(content)) {
+                //撤回消息：显示“xxx 撤回了一条消息”
+                parseRevokeMessage();
+            } else if (isPatMsgContent(content)) {
                 //新版微信把拍一拍放进appmsg的patMsg节点，与rawType无关
                 parsePatMessage();
             } else {
@@ -96,7 +101,7 @@ public class SystemMessage extends Message {
     @Override
     public CharSequence getSpannedContent() {
         if (spannedContent == null) {
-            if (isPatMsgContent(content)) {
+            if (isRevokeMsgContent(content) || isPatMsgContent(content)) {
                 spannedContent = getParsedContent();
             } else {
                 switch (getRawType()) {
@@ -217,6 +222,34 @@ public class SystemMessage extends Message {
                 matchedMap.put(currentPattern, matched);
             }
         }
+    }
+
+    /**
+     * 判断消息content是否为撤回消息（微信写入的sysmsg/revokemsg节点）
+     */
+    public static boolean isRevokeMsgContent(@Nullable String content) {
+        if (content == null) {
+            return false;
+        }
+        return content.contains("revokemsg") || content.contains("<replacemsg>");
+    }
+
+    private static final Pattern REVOKE_REPLACE_PATTERN =
+            Pattern.compile("<replacemsg>(?:<!\\[CDATA\\[)?(.*?)(?:\\]\\]>)?</replacemsg>", Pattern.DOTALL);
+
+    /**
+     * 解析撤回消息，提取replacemsg中的可读文本（如“xxx 撤回了一条消息”），提取失败时回退到“消息已撤回”。
+     */
+    private void parseRevokeMessage() {
+        Matcher matcher = REVOKE_REPLACE_PATTERN.matcher(content);
+        if (matcher.find()) {
+            String text = matcher.group(1).trim();
+            if (text.length() > 0) {
+                parsedContent = text;
+                return;
+            }
+        }
+        parsedContent = "消息已撤回";
     }
 
     /**

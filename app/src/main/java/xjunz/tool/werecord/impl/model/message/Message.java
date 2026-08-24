@@ -481,13 +481,19 @@ public abstract class Message implements Parcelable, Exportable {
         User user = getCurrentUser();
         if (localImagePath == null) {
             if (!TextUtils.isEmpty(imgPath)) {
-                if (imgPath.startsWith("T")) {
-                    int index = imgPath.lastIndexOf("_");
+                int index = imgPath.lastIndexOf("_");
+                if (index >= 0 && index < imgPath.length() - 1) {
                     String md5 = imgPath.substring(index + 1);
-                    localImagePath = user.imageCachePath + File.separator
-                            + md5.substring(0, 2) + File.separator
-                            + md5.substring(2, 4) + File.separator
-                            + "th_" + md5;
+                    if (imgPath.startsWith("T")) {
+                        //图片缩略图：image2/<md5前2>/<md5次2>/th_<md5>
+                        localImagePath = user.imageCachePath + File.separator
+                                + md5.substring(0, 2) + File.separator
+                                + md5.substring(2, 4) + File.separator
+                                + "th_" + md5;
+                    } else if (imgPath.startsWith("V")) {
+                        //视频缩略图：video/th_<md5>
+                        localImagePath = user.videoCachePath + File.separator + "th_" + md5;
+                    }
                 }
             }
         }
@@ -543,6 +549,11 @@ public abstract class Message implements Parcelable, Exportable {
             String emoji = user.emojiCachePath + File.separator + md5;
             candidates.add(emoji);
             candidates.add(emoji + ".gif");
+            //视频目录（视频缩略图/视频文件）
+            String video = user.videoCachePath + File.separator + md5;
+            candidates.add(video + ".jpg");
+            candidates.add(video);
+            candidates.add(user.videoCachePath + File.separator + "th_" + md5);
         }
         return candidates.toArray(new String[0]);
     }
