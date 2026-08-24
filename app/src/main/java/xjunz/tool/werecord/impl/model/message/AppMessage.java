@@ -20,6 +20,8 @@ import org.xml.sax.helpers.DefaultHandler;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
@@ -158,6 +160,39 @@ public class AppMessage extends ComplexMessage {
     }
 
     /**
+     * 净化被引用消息的内容：反转义XML实体；若内容本身是转义的XML（如被回复的是另一条回复/app消息），
+     * 则提取其中的title作为可读文本。
+     */
+    @Nullable
+    private static String purifyReferContent(@Nullable String raw) {
+        if (raw == null || raw.length() == 0) {
+            return raw;
+        }
+        //反转义XML实体
+        String decoded = raw.replace("&lt;", "<").replace("&gt;", ">")
+                .replace("&quot;", "\"").replace("&apos;", "'").replace("&amp;", "&");
+        //若反转义后是消息XML，提取可读文本（title优先）
+        if (decoded.contains("<msg>") || decoded.contains("<appmsg>")) {
+            Matcher titleMatcher = Pattern.compile("<title>(.*?)</title>", Pattern.DOTALL).matcher(decoded);
+            if (titleMatcher.find()) {
+                String title = titleMatcher.group(1).trim();
+                if (title.length() > 0) {
+                    return title;
+                }
+            }
+            Matcher contentMatcher = Pattern.compile("<content>(.*?)</content>", Pattern.DOTALL).matcher(decoded);
+            if (contentMatcher.find()) {
+                String content = contentMatcher.group(1).trim();
+                if (content.length() > 0) {
+                    return content;
+                }
+            }
+            return "(回复消息)";
+        }
+        return decoded;
+    }
+
+    /**
      * @return 被回复的原始消息内容，非回复消息返回null
      */
     @Nullable
@@ -250,7 +285,7 @@ public class AppMessage extends ComplexMessage {
                     break;
                 case "refermsg":
                     inReferMsg = false;
-                    mReferContent = referContent.length() == 0 ? null : referContent.toString();
+                    mReferContent = referContent.length() == 0 ? null : purifyReferContent(referContent.toString());
                     String displayName = referSender.length() == 0 ? null : referSender.toString();
                     if (displayName == null && referFallback.length() > 0) {
                         //displayname缺失时，用fromusr/chatusr解析发送者名字
