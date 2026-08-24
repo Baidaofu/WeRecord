@@ -98,6 +98,14 @@ public class SimpleEditorFragment extends EditorFragment {
         return mVictim instanceof SystemMessage;
     }
 
+    /**
+     * @return 是否为拍一拍消息（新版微信将拍一拍存储在appmsg的patMsg节点中）
+     */
+    private boolean isPatMsg() {
+        String raw = mVictim.getRawContent();
+        return raw != null && raw.contains("<patMsg>");
+    }
+
     private void initItems() {
         mItems = new ArrayList<>();
         //通用项目
@@ -106,7 +114,8 @@ public class SimpleEditorFragment extends EditorFragment {
             //模板
             mItems.add(new EditorItem(EditorItem.KEY_TEMPLATE, R.string.template, () -> mTemplate == null ? getString(R.string.bracketed_none) : mTemplate.getName()));
         }
-        mItems.add(mContentItem = new EditorItem(Message.ABSTRACT_KEY_CONTENT, R.string.msg_content));
+        mItems.add(mContentItem = new EditorItem(Message.ABSTRACT_KEY_CONTENT, R.string.msg_content,
+                () -> isPatMsg() ? mVictim.getParsedContent() : (String) mVictim.get(Message.ABSTRACT_KEY_CONTENT)));
         mItems.add(new EditorItem(Message.KEY_CREATE_TIME, R.string.send_time, () -> Utils.formatDate(mVictim.getCreateTimeStamp())));
         mItems.add(mStatusItem = new EditorItem(Message.KEY_STATUS, R.string.send_status,
                 () -> getString(mVictim.supportModifySendStatus() ? mVictim.sendFailed() ? R.string.status_send_failed : R.string.status_send_suc : R.string.modify_send_status_not_supported), () -> mVictim.supportModifySendStatus()) {
@@ -383,9 +392,18 @@ public class SimpleEditorFragment extends EditorFragment {
             switch (item.key) {
                 case Message.ABSTRACT_KEY_CONTENT:
                 case CallMessage.ABSTRACT_KEY_CALL_CONTENT:
-                    new ContentEditorDialog().setLabel(item.caption)
-                            .setDefault(mVictim.get(item.key))
-                            .setPassableCallback(item::setValue).show(getParentFragmentManager(), item.key);
+                    if (isPatMsg()) {
+                        //拍一拍消息：编辑友好文本，保存时更新XML中的template节点，保持XML结构完整
+                        String rawXml = mVictim.getRawContent();
+                        new ContentEditorDialog().setLabel(item.caption)
+                                .setDefault(mVictim.getParsedContent())
+                                .setPassableCallback(newContent -> item.setValue(SystemMessage.updatePatTemplate(rawXml, newContent)))
+                                .show(getParentFragmentManager(), item.key);
+                    } else {
+                        new ContentEditorDialog().setLabel(item.caption)
+                                .setDefault(mVictim.get(item.key))
+                                .setPassableCallback(item::setValue).show(getParentFragmentManager(), item.key);
+                    }
                     break;
                 case Message.KEY_STATUS:
                     item.setValue(mVictim.sendFailed() ? Message.STATUS_SEND_SUC : Message.STATUS_SEND_FAILED);

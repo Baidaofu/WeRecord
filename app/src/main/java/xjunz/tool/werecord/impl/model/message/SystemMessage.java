@@ -27,6 +27,7 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 import xjunz.tool.werecord.impl.model.account.Contact;
+import xjunz.tool.werecord.impl.model.account.User;
 import xjunz.tool.werecord.impl.repo.ContactRepository;
 import xjunz.tool.werecord.impl.repo.RepositoryFactory;
 import xjunz.tool.werecord.util.Utils;
@@ -69,16 +70,21 @@ public class SystemMessage extends Message {
     @Override
     public String getParsedContent() {
         if (parsedContent == null) {
-            switch (getRawType()) {
-                case TYPE_SYSTEM_JOIN_GROUP:
-                    parseJoinGroupMessage();
-                    break;
-                case TYPE_SYSTEM_PAT:
-                    parsePatMessage();
-                    break;
-                default:
-                    parsedContent = getHtml().toString();
-                    break;
+            if (content != null && content.contains("<patMsg>")) {
+                //新版微信把拍一拍放进appmsg的patMsg节点，与rawType无关
+                parsePatMessage();
+            } else {
+                switch (getRawType()) {
+                    case TYPE_SYSTEM_JOIN_GROUP:
+                        parseJoinGroupMessage();
+                        break;
+                    case TYPE_SYSTEM_PAT:
+                        parsePatMessage();
+                        break;
+                    default:
+                        parsedContent = getHtml().toString();
+                        break;
+                }
             }
         }
         return parsedContent;
@@ -88,14 +94,18 @@ public class SystemMessage extends Message {
     @Override
     public CharSequence getSpannedContent() {
         if (spannedContent == null) {
-            switch (getRawType()) {
-                case TYPE_SYSTEM_JOIN_GROUP:
-                case TYPE_SYSTEM_PAT:
-                    spannedContent = getParsedContent();
-                    break;
-                default:
-                    spannedContent = getHtml();
-                    break;
+            if (content != null && content.contains("<patMsg>")) {
+                spannedContent = getParsedContent();
+            } else {
+                switch (getRawType()) {
+                    case TYPE_SYSTEM_JOIN_GROUP:
+                    case TYPE_SYSTEM_PAT:
+                        spannedContent = getParsedContent();
+                        break;
+                    default:
+                        spannedContent = getHtml();
+                        break;
+                }
             }
         }
         return spannedContent;
@@ -207,44 +217,136 @@ public class SystemMessage extends Message {
         }
     }
 
+    /**
+     * 将拍一拍消息XML中的template节点文本更新为newText，保持XML结构完整。
+     * 同时兼容CDATA形式（<template><![CDATA[...]]></template>）和普通文本形式。
+     *
+     * @return 更新后的XML，若未找到template节点则原样返回
+     */
+    @NotNull
+    public static String updatePatTemplate(@NotNull String xml, @NotNull String newText) {
+        //CDATA形式
+        String escaped = newText.replace("]]>", "]]]]><![CDATA[>");
+        String replaced = xml.replaceFirst("(<template><!\\[CDATA\\[)(.*?)(\\]\\]></template>)", "$1" + escaped + "$3");
+        if (!replaced.equals(xml)) {
+            return replaced;
+        }
+        //普通文本形式
+        return xml.replaceFirst("(<template>)(.*?)(</template>)", "$1" + newText + "$3");
+    }
+
+
     private class PatMessageHandler extends DefaultHandler {
+        private boolean inPatMsg;
+        private boolean inRecords;
+        private boolean inRecord;
         private boolean inTemplate;
+        private boolean inFromUser;
+        private boolean inPattedUser;
         private final StringBuilder message;
         private final ContactRepository repo;
+        //当前record的字段
+        private String curFromUser;
+        private String curPattedUser;
+        private StringBuilder curTemplate;
+        //正在累积的文本节点
+        private StringBuilder curText;
+        private List<String> patList;
 
         public PatMessageHandler() {
             super();
             message = new StringBuilder();
             repo = RepositoryFactory.get(ContactRepository.class);
+            patList = new ArrayList<>();
         }
 
         @Override
         public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
             super.startElement(uri, localName, qName, attributes);
-            if ("template".equals(qName)) {
-                inTemplate = true;
+            switch (qName) {
+                case "patMsg":
+                    inPatMsg = true;
+                    break;
+                case "records":
+                    inRecords = true;
+                    break;
+                case "record":
+                    inRecord = true;
+                    curFromUser = null;
+                    curPattedUser = null;
+                    curTemplate = new StringBuilder();
+                    break;
+                case "template":
+                    inTemplate = true;
+                    break;
+                case "fromUser":
+                    inFromUser = true;
+                    curText = new StringBuilder();
+                    break;
+                case "pattedUser":
+                    inPattedUser = true;
+                    curText = new StringBuilder();
+                    break;
             }
         }
 
         @Override
         public void endElement(String uri, String localName, String qName) throws SAXException {
             super.endElement(uri, localName, qName);
-            if ("template".equals(qName)) {
-                inTemplate = false;
+            switch (qName) {
+                case "patMsg":
+                    inPatMsg = false;
+                    break;
+                case "records":
+                    inRecords = false;
+                    break;
+                case "record":
+                    inRecord = false;
+                    //本record解析完成，处理模板占位符
+                    patList.add(resolvePatTemplate(curTemplate.toString()));
+                    break;
+                case "template":
+                    inTemplate = false;
+                    break;
+                case "fromUser":
+                    inFromUser = false;
+                    curFromUser = curText == null ? null : curText.toString();
+                    curText = null;
+                    break;
+                case "pattedUser":
+                    inPattedUser = false;
+                    curPattedUser = curText == null ? null : curText.toString();
+                    curText = null;
+                    break;
             }
         }
 
         @Override
         public void endDocument() throws SAXException {
             super.endDocument();
-            parsedContent = message.toString();
+            if (patList.size() == 0 && message.length() > 0) {
+                //旧格式：template直接包含文本
+                parsedContent = message.toString();
+            } else {
+                parsedContent = String.join("\n", patList);
+            }
         }
 
         @Override
         public void characters(char[] ch, int start, int length) throws SAXException {
             super.characters(ch, start, length);
-            if (inTemplate) {
-                String text = new String(ch, start, length);
+            String text = new String(ch, start, length);
+            if (text.length() == 0) {
+                return;
+            }
+            if (inTemplate && curTemplate != null) {
+                curTemplate.append(text);
+            } else if (inFromUser && curText != null) {
+                curText.append(text);
+            } else if (inPattedUser && curText != null) {
+                curText.append(text);
+            } else if (inTemplate) {
+                //旧格式：template直接位于patMsg下（无record），解析其中的${wxid}占位符
                 List<String> wxids = Utils.extract(text, "\\$\\{(.+?)\\}");
                 for (String wxid : wxids) {
                     Contact contact = repo.get(wxid);
@@ -258,6 +360,97 @@ public class SystemMessage extends Message {
                     message.append("\n").append(text);
                 }
             }
+        }
+
+        /**
+         * 解析一条拍一拍记录模板，替换新版占位符：
+         * 1. 关键字占位符（${fromusername@xxx} / ${pattedusername@xxx}）：用record的fromUser/pattedUser查名字；
+         *    模板已预填名字时替换为空；模板以“我”开头且fromUser是当前用户时替换为空。
+         * 2. wxid占位符（${qq_xxx}等）：直接用wxid查联系人，查不到保留wxid原文。
+         */
+        private String resolvePatTemplate(String template) {
+            if (template == null || template.length() == 0) {
+                //模板缺失时回退为“xxx拍了拍yyy”
+                return resolveName(curFromUser) + "拍了拍" + resolveName(curPattedUser);
+            }
+            List<String> placeholders = Utils.extract(template, "\\$\\{(.+?)\\}");
+            if (placeholders.size() == 0) {
+                return template;
+            }
+            //先把所有占位符替换为哨兵字符，避免去重判断把占位符本身误认为预填名字
+            String masked = template;
+            List<String> sentinels = new ArrayList<>();
+            for (String placeholder : placeholders) {
+                String sentinel = "\uE000" + sentinels.size();
+                sentinels.add(sentinel);
+                masked = masked.replace("${" + placeholder + "}", sentinel);
+            }
+            boolean startsWithMe = masked.startsWith("我");
+            for (int i = 0; i < placeholders.size(); i++) {
+                String name = resolvePlaceholderName(placeholders.get(i), startsWithMe);
+                String sentinel = sentinels.get(i);
+                if (name == null || name.length() == 0) {
+                    masked = masked.replace(sentinel, "");
+                } else if (masked.contains(name)) {
+                    //模板中已直接写了名字（如“宋婧敏”），占位符替换为空避免重复
+                    masked = masked.replace(sentinel, "");
+                } else {
+                    masked = masked.replace(sentinel, name);
+                }
+            }
+            return masked;
+        }
+
+        /**
+         * 解析单个占位符对应的显示名
+         */
+        private String resolvePlaceholderName(String placeholder, boolean startsWithMe) {
+            String key = placeholder;
+            int atIndex = key.indexOf('@');
+            if (atIndex >= 0) {
+                key = key.substring(0, atIndex);
+            }
+            if ("fromusername".equalsIgnoreCase(key)) {
+                if (startsWithMe && isSelf(curFromUser)) {
+                    //模板以“我”开头且fromUser是当前用户，“我”已表达发送者，占位符替换为空
+                    return "";
+                }
+                return resolveName(curFromUser);
+            } else if ("pattedusername".equalsIgnoreCase(key)) {
+                return resolveName(curPattedUser);
+            } else {
+                //wxid占位符（旧格式或新格式的其它占位符）
+                return resolveName(key);
+            }
+        }
+
+        /**
+         * 判断wxid是否为当前登录用户
+         */
+        private boolean isSelf(String wxid) {
+            if (wxid == null || wxid.length() == 0) {
+                return false;
+            }
+            try {
+                User me = getCurrentUser();
+                return me != null && me.id != null && me.id.equals(wxid);
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        /**
+         * 将wxid解析为可显示的名字，查不到时保留wxid原文
+         */
+        private String resolveName(String wxid) {
+            if (wxid == null || wxid.length() == 0) {
+                return "";
+            }
+            Contact contact = repo.get(wxid);
+            if (contact != null) {
+                return contact.getName();
+            }
+            return wxid;
         }
     }
 
