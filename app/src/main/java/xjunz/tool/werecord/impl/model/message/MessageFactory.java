@@ -257,7 +257,8 @@ public final class MessageFactory {
             case TYPE_LOCATION:
                 return new AppMessage(values, Type.LOCATION);
             case TYPE_PUSH:
-                return new UnpreviewableMessage(values, Type.PUSH);
+                //公众号推送：与普通appmsg同构（title/des/type），走AppMessage解析，避免显示“暂不支持预览”
+                return new AppMessage(values, Type.PUSH);
             case TYPE_16777265:
             case TYPE_SHARE:
                 return new AppMessage(values, Type.SHARE);

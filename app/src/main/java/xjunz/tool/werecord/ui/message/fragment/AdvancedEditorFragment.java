@@ -250,7 +250,7 @@ public class AdvancedEditorFragment extends EditorFragment {
                 ItemAdvancedEditorBinding advancedEditorBinding = (ItemAdvancedEditorBinding) binding;
                 this.itemView.setOnClickListener(this);
                 advancedEditorBinding.btnReset.setOnClickListener(this);
-                //长按复制属性标题/内容
+                //长按复制属性标题/内容（根布局不再用enabled禁用，所有项均可长按）
                 this.itemView.setOnLongClickListener(v -> {
                     EditorItem item = mEditorItems.get(getAdapterPosition());
                     if (item != null) {
@@ -295,6 +295,10 @@ public class AdvancedEditorFragment extends EditorFragment {
             EditorItem item = mEditorItems.get(getAdapterPosition());
             if (v.getId() == R.id.btn_reset) {
                 item.reset();
+                return;
+            }
+            if (item == null || !item.isEditable()) {
+                //不可编辑项（如type/msgid/talker）点击不响应
                 return;
             }
             if (Message.KEY_LV_BUFFER.equals(item.key)) {

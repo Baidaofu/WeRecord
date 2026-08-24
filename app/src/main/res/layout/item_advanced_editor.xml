@@ -18,7 +18,6 @@
         android:background="@drawable/bg_selectable_item_floating"
         android:clickable="true"
         android:elevation="@dimen/z_item"
-        android:enabled="@{item.editable}"
         android:focusable="true">
 
         <TextView
@@ -27,8 +26,8 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:layout_marginTop="8dp"
+            android:alpha="@{item.editable?1f:0.45f}"
             android:changed="@{item.changed}"
-            android:duplicateParentState="true"
             android:text="@{item.key}"
             android:textAppearance="@style/TextAppearance.AppCompat.Subhead"
             android:textColor="?colorControlActivated"
@@ -42,7 +41,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/dp_4"
             android:layout_marginEnd="16dp"
-            android:duplicateParentState="true"
+            android:alpha="@{item.editable?1f:0.45f}"
             android:ellipsize="end"
             android:emptyFallback="@{true}"
             android:maxLines="12"
