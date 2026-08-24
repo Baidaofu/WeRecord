@@ -187,10 +187,24 @@ public class DebugActivity extends BaseActivity {
             }
             String internal = tmpFile.getAbsolutePath();
             net.sqlcipher.database.SQLiteDatabase src = mEnv.getWorkerDatabase();
-            //创建未加密的独立数据库，用sqlcipher_export复制指定表（与导出解密数据库同方案）
-            src.rawExecSQL("ATTACH DATABASE '" + internal + "' AS export_db KEY ''");
-            src.rawExecSQL("SELECT sqlcipher_export('export_db', '" + tableName + "');");
-            src.rawExecSQL("DETACH DATABASE export_db");
+            //清理可能遗留的同名连接
+            try {
+                src.rawExecSQL("DETACH DATABASE export_db");
+            } catch (Exception ignored) {
+            }
+            //使用唯一连接名，避免与遗留连接冲突
+            String attachName = "export_db_" + System.currentTimeMillis();
+            try {
+                //创建未加密的独立数据库并复制指定表
+                src.rawExecSQL("ATTACH DATABASE '" + internal + "' AS " + attachName + " KEY ''");
+                src.rawExecSQL("CREATE TABLE " + attachName + "." + tableName + " AS SELECT * FROM main." + tableName);
+            } finally {
+                //无论成功失败都释放连接，避免连接泄漏
+                try {
+                    src.rawExecSQL("DETACH DATABASE " + attachName);
+                } catch (Exception ignored) {
+                }
+            }
             //root复制到外部存储
             String tar = android.os.Environment.getExternalStorageDirectory() + File.separator + fileName;
             ShellUtils.cp(internal, tar);
