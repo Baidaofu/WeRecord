@@ -225,25 +225,42 @@ public class SystemMessage extends Message {
     }
 
     /**
-     * 判断消息content是否为撤回消息（微信写入的sysmsg/revokemsg节点）
+     * 判断消息content是否为撤回消息。
+     * 标准格式为微信写入的sysmsg/revokemsg节点；
+     * 同时兼容部分工具改写后的提示文本格式（含“撤回了一条消息”等专属文案）。
      */
     public static boolean isRevokeMsgContent(@Nullable String content) {
         if (content == null) {
             return false;
         }
-        return content.contains("revokemsg") || content.contains("<replacemsg>");
+        if (content.contains("revokemsg") || content.contains("<replacemsg>") || content.contains("<sysmsg")) {
+            return true;
+        }
+        //部分工具可能把提示写成普通文本/自定义格式
+        return content.contains("撤回了一条消息") || content.contains("撤回一条消息") || content.contains("尝试撤回一条消息");
     }
 
     private static final Pattern REVOKE_REPLACE_PATTERN =
             Pattern.compile("<replacemsg>(?:<!\\[CDATA\\[)?(.*?)(?:\\]\\]>)?</replacemsg>", Pattern.DOTALL);
+    private static final Pattern REVOKE_TEXT_PATTERN =
+            Pattern.compile("[^<>\\s]*\\s*[\"“’]?[^<>\\r\\n]{0,30}?(尝试)?撤回(了)?一条消息[^<>\\r\\n]{0,20}");
 
     /**
-     * 解析撤回消息，提取replacemsg中的可读文本（如“xxx 撤回了一条消息”），提取失败时回退到“消息已撤回”。
+     * 解析撤回消息：优先提取replacemsg中的可读文本；
+     * 其次从content中提取包含“撤回了一条消息”的片段；均失败时回退到“消息已撤回”。
      */
     private void parseRevokeMessage() {
         Matcher matcher = REVOKE_REPLACE_PATTERN.matcher(content);
         if (matcher.find()) {
             String text = matcher.group(1).trim();
+            if (text.length() > 0) {
+                parsedContent = text;
+                return;
+            }
+        }
+        Matcher textMatcher = REVOKE_TEXT_PATTERN.matcher(content);
+        if (textMatcher.find()) {
+            String text = textMatcher.group().trim();
             if (text.length() > 0) {
                 parsedContent = text;
                 return;

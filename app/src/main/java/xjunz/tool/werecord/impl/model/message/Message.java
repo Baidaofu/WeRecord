@@ -534,13 +534,23 @@ public abstract class Message implements Parcelable, Exportable {
             return new String[0];
         }
         List<String> candidates = new ArrayList<>();
+        User user = getCurrentUser();
         String fromImgPath = getLocalImagePath();
         if (fromImgPath != null) {
             candidates.add(fromImgPath);
         }
+        //视频消息：imgpath为纯数字（视频ID）时，在video目录构造候选路径
+        String imgPath = getImgPath();
+        if (fromImgPath == null && imgPath != null && imgPath.matches("\\d+")) {
+            String video = user.videoCachePath + File.separator + imgPath;
+            candidates.add(video + ".jpg");
+            candidates.add(video + ".mp4");
+            candidates.add(video);
+            candidates.add(user.videoCachePath + File.separator + "th_" + imgPath);
+            candidates.add(user.videoCachePath + File.separator + "th_" + imgPath + ".jpg");
+        }
         String md5 = extractMediaMd5FromContent();
         if (md5 != null && md5.length() >= 4) {
-            User user = getCurrentUser();
             String base = user.imageCachePath + File.separator + md5.substring(0, 2) + File.separator + md5.substring(2, 4);
             //缩略图与原图
             candidates.add(base + File.separator + "th_" + md5);
