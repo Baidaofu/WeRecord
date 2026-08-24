@@ -18,134 +18,77 @@
         android:layout_height="match_parent"
         android:padding="@dimen/spacing_normal">
 
-
         <TextView
             android:id="@+id/tv_title_0"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/functions"
             android:textColor="?colorAccent"
+            android:textSize="18sp"
+            android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <HorizontalScrollView
-            android:id="@+id/function_container"
-            android:layout_width="match_parent"
+        <TextView
+            android:id="@+id/tv_selected"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/spacing_unit"
+            android:text="@string/no_function_selected"
+            android:textAppearance="@style/TextAppearance.AppCompat.Subhead"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tv_title_0">
+            app:layout_constraintTop_toBottomOf="@+id/tv_title_0"
+            tools:text="@tools:sample/lorem" />
 
-            <androidx.constraintlayout.widget.ConstraintLayout
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent">
+        <Button
+            android:id="@+id/btn_select"
+            style="@style/Widget.AppCompat.Button.Colored"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_unit"
+            android:onClick="onSelectFunction"
+            android:text="@string/select_function"
+            app:layout_constraintEnd_toStartOf="@+id/btn_execute"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/tv_selected" />
 
-                <Button
-                    android:id="@+id/button3"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:onClick="deleteBackupTable"
-                    android:text="删除备份表"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent" />
+        <Button
+            android:id="@+id/btn_execute"
+            style="@style/Widget.AppCompat.Button.Borderless.Colored"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/spacing_unit"
+            android:onClick="onExecute"
+            android:text="@string/confirm"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/btn_select"
+            app:layout_constraintTop_toTopOf="@+id/btn_select" />
 
-                <Button
-                    android:id="@+id/button4"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:onClick="showEnvInfo"
-                    android:text="显示环境信息"
-                    app:layout_constraintBottom_toBottomOf="@+id/button3"
-                    app:layout_constraintStart_toEndOf="@+id/button3"
-                    app:layout_constraintTop_toTopOf="@+id/button3" />
-
-                <Button
-                    android:id="@+id/button5"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:onClick="exportDatabase"
-                    android:text="导出消息数据库"
-                    app:layout_constraintBottom_toBottomOf="@+id/button4"
-                    app:layout_constraintStart_toEndOf="@+id/button4"
-                    app:layout_constraintTop_toTopOf="@+id/button4" />
-
-                <Button
-                    android:id="@+id/button6"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:onClick="simulateSysRecycle"
-                    android:text="模拟系统回收"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@+id/button3" />
-
-                <Button
-                    android:id="@+id/button7"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:onClick="exportTemplateDb"
-                    android:text="导出模板数据库"
-                    app:layout_constraintStart_toEndOf="@+id/button6"
-                    app:layout_constraintTop_toBottomOf="@+id/button3" />
-
-                <Button
-                    android:id="@+id/button8"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:onClick="deleteTemplateDb"
-                    android:text="删除模板数据库"
-                    app:layout_constraintStart_toEndOf="@+id/button7"
-                    app:layout_constraintTop_toBottomOf="@+id/button3" />
-
-                <Button
-                    android:id="@+id/button9"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:onClick="restoreMsgDatabaseBackup"
-                    android:text="还原消息数据库备份"
-                    app:layout_constraintStart_toEndOf="@+id/button10"
-                    app:layout_constraintTop_toBottomOf="@+id/button6" />
-
-                <Button
-                    android:id="@+id/button10"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:onClick="backupMsgDatabase"
-                    android:text="备份消息数据库"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@+id/button6" />
-
-                <Button
-                    android:id="@+id/button11"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:onClick="caughtException"
-                    android:text="模拟捕获异常"
-                    app:layout_constraintStart_toEndOf="@+id/button9"
-                    app:layout_constraintTop_toTopOf="@+id/button9" />
-
-                <Button
-                    android:id="@+id/button12"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="模拟未捕获异常"
-                    android:onClick="uncaughtException"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@+id/button10" />
-            </androidx.constraintlayout.widget.ConstraintLayout>
-        </HorizontalScrollView>
-
+        <TextView
+            android:id="@+id/tv_desc"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_unit"
+            android:padding="@dimen/spacing_unit"
+            android:background="@drawable/bg_edit_box"
+            android:textColor="?android:textColorSecondary"
+            android:textSize="14sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/btn_select"
+            tools:text="@tools:sample/lorem" />
 
         <TextView
             android:id="@+id/tv_title_2"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="@dimen/spacing_normal"
             android:gravity="top"
             android:text="@string/environment_info_output"
             android:textColor="?colorAccent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/function_container" />
+            app:layout_constraintTop_toBottomOf="@+id/tv_desc" />
 
         <EditText
             android:id="@+id/et_output"

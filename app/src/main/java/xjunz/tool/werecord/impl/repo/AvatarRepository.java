@@ -150,6 +150,24 @@ public class AvatarRepository extends LifecyclePerceptiveRepository {
     }
 
     /**
+     * 清除全部头像缓存（内存缓存与本地备份文件），
+     * 下次获取头像时将重新从微信缓存目录加载。
+     */
+    public void clearCache() {
+        synchronized (mAvatarCache) {
+            mAvatarCache.evictAll();
+        }
+        File backupDir = new File(getEnvironment().getAvatarBackupPath());
+        File[] files = backupDir.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                //noinspection ResultOfMethodCallIgnored
+                file.delete();
+            }
+        }
+    }
+
+    /**
      * 转码指定微信头像
      *
      * @param AvatarBitmap 头像图片

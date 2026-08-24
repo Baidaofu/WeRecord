@@ -27,6 +27,8 @@ import xjunz.tool.werecord.App;
 import xjunz.tool.werecord.BuildConfig;
 import xjunz.tool.werecord.R;
 import xjunz.tool.werecord.databinding.ActivityMainBinding;
+import xjunz.tool.werecord.impl.repo.AvatarRepository;
+import xjunz.tool.werecord.impl.repo.RepositoryFactory;
 import xjunz.tool.werecord.ui.base.RecycleAwareActivity;
 import xjunz.tool.werecord.ui.customview.MasterToast;
 import xjunz.tool.werecord.ui.main.fragment.ChatFragment;
@@ -190,7 +192,11 @@ public class MainActivity extends RecycleAwareActivity {
 
     public void restartToSync(View view) {
         UiUtils.createAlert(this, R.string.alert_restart_to_sync)
-                .setPositiveButton(android.R.string.ok, (dialog, which) -> restartWithoutVerification())
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    //清除头像缓存，重新从微信缓存目录加载（微信可能刚下载了新头像）
+                    RepositoryFactory.get(AvatarRepository.class).clearCache();
+                    restartWithoutVerification();
+                })
                 .setNegativeButton(android.R.string.cancel, null).show();
     }
 
