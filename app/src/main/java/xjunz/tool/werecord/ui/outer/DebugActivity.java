@@ -170,15 +170,19 @@ public class DebugActivity extends BaseActivity {
         dialog.show();
         final String[] result = new String[1];
         RxJavaUtils.complete(() -> {
-            String tar = android.os.Environment.getExternalStorageDirectory() + File.separator + fileName;
-            File tarFile = new File(tar);
+            //先导出到应用私有缓存目录（应用可写），再通过root复制到外部存储
+            File tmpFile = new File(getCacheDir(), fileName);
             //noinspection ResultOfMethodCallIgnored
-            tarFile.delete();
+            tmpFile.delete();
+            String internal = tmpFile.getAbsolutePath();
             net.sqlcipher.database.SQLiteDatabase src = mEnv.getWorkerDatabase();
             //创建未加密的独立数据库并复制指定表
-            src.execSQL("ATTACH DATABASE '" + tar + "' AS export_db KEY ''");
+            src.execSQL("ATTACH DATABASE '" + internal + "' AS export_db KEY ''");
             src.execSQL("CREATE TABLE export_db." + tableName + " AS SELECT * FROM main." + tableName);
             src.execSQL("DETACH DATABASE export_db");
+            //root复制到外部存储
+            String tar = android.os.Environment.getExternalStorageDirectory() + File.separator + fileName;
+            ShellUtils.cp(internal, tar);
             result[0] = tar;
         }).subscribe(new RxJavaUtils.CompletableObservableAdapter() {
             @Override

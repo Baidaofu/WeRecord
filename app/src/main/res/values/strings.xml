@@ -292,6 +292,7 @@
     <string name="export">导出</string>
     <string name="caption_zombie_friend">单向好友俗称"僵尸"好友，是指对方已将您从联系人列表中删除，而仍然在您的联系人列表中存在的好友。
         此功能可以无打扰式地查找可能存在的单向好友。\n注：<b>结果仅供参考</b>。点击打开查看，可请在<b>通讯录->标签->可能的单向好友</b>中查看、删除单向好友。</string>
+    <string name="note_zombie_estimation">提示：该结果基于本地数据库推测，新版微信判断可能不准，仅供参考，请勿据此操作。</string>
     <string name="delete_all">全部删除</string>
     <string name="colon">: </string>
     <string name="possible_zombies">可能的单向好友</string>

@@ -110,10 +110,13 @@ public class Contact extends Account implements TableExportable {
 
     /**
      * 返回某个好友是否为单向好友（僵尸）
+     * <p>新版微信中带@stranger标记的不一定都是单向好友（如rawType=515的星标好友也有该标记），
+     * 因此仅当rawType为普通保存好友(3)且lvbuff[32]以@stranger结尾时才判定为单向好友。</p>
      */
     public boolean isPossibleZombie() {
-        if (type == Type.FRIEND && parsedLvBuffer != null) {
-            String encrypted = (String) parsedLvBuffer[32];
+        if (type == Type.FRIEND && rawType == RAW_TYPE_SAVED_3 && parsedLvBuffer != null && parsedLvBuffer.length > 32) {
+            Object obj = parsedLvBuffer[32];
+            String encrypted = obj instanceof String ? (String) obj : null;
             return encrypted != null && encrypted.endsWith("@stranger");
         }
         return false;
