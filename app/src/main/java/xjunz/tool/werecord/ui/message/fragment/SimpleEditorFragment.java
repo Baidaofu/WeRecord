@@ -99,11 +99,10 @@ public class SimpleEditorFragment extends EditorFragment {
     }
 
     /**
-     * @return 是否为拍一拍消息（新版微信将拍一拍存储在appmsg的patMsg节点中）
+     * @return 是否为拍一拍消息（新版微信将拍一拍存储在appmsg的patMsg节点中，recordNum>0）
      */
     private boolean isPatMsg() {
-        String raw = mVictim.getRawContent();
-        return raw != null && raw.contains("<patMsg>");
+        return SystemMessage.isPatMsgContent(mVictim.getRawContent());
     }
 
     private void initItems() {

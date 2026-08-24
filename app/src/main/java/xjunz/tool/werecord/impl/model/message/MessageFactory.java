@@ -214,8 +214,8 @@ public final class MessageFactory {
     public static Message createMessage(@NonNull ContentValues values) {
         int rawType = values.getAsInteger(Message.KEY_TYPE);
         String rawContent = values.getAsString(Message.KEY_CONTENT);
-        //新版微信拍一拍：无论rawType是什么，只要内容包含patMsg节点就走系统消息解析
-        if (rawContent != null && rawContent.contains("<patMsg>")) {
+        //新版微信拍一拍：真正的拍一拍消息（patMsg含record）无论rawType是什么都走系统消息解析
+        if (SystemMessage.isPatMsgContent(rawContent)) {
             return new SystemMessage(values);
         }
         switch (rawType) {

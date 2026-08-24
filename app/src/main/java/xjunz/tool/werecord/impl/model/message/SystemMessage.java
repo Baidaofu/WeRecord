@@ -8,6 +8,7 @@ import android.os.Parcel;
 import android.text.Spanned;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.text.HtmlCompat;
 
 import org.jetbrains.annotations.Contract;
@@ -71,7 +72,7 @@ public class SystemMessage extends Message {
     @Override
     public String getParsedContent() {
         if (parsedContent == null) {
-            if (content != null && content.contains("<patMsg>")) {
+            if (isPatMsgContent(content)) {
                 //新版微信把拍一拍放进appmsg的patMsg节点，与rawType无关
                 parsePatMessage();
             } else {
@@ -95,7 +96,7 @@ public class SystemMessage extends Message {
     @Override
     public CharSequence getSpannedContent() {
         if (spannedContent == null) {
-            if (content != null && content.contains("<patMsg>")) {
+            if (isPatMsgContent(content)) {
                 spannedContent = getParsedContent();
             } else {
                 switch (getRawType()) {
@@ -216,6 +217,20 @@ public class SystemMessage extends Message {
                 matchedMap.put(currentPattern, matched);
             }
         }
+    }
+
+    /**
+     * 判断消息content是否为真正的拍一拍消息：
+     * 新版微信在appmsg中总是携带空的patMsg节点（recordNum=0），只有含record元素（recordNum&gt;0）
+     * 或旧版直接含template的才是真正的拍一拍消息。
+     */
+    public static boolean isPatMsgContent(@Nullable String content) {
+        if (content == null) {
+            return false;
+        }
+        //新版：patMsg内含record元素（有拍一拍记录）
+        //旧版：patMsg直接含template
+        return content.contains("<record>") || (content.contains("<patMsg>") && content.contains("<template>"));
     }
 
     /**

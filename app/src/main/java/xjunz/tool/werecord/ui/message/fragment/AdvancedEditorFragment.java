@@ -35,6 +35,7 @@ import xjunz.tool.werecord.databinding.FragmentAdvancedEditorBinding;
 import xjunz.tool.werecord.databinding.ItemAdvancedEditorBinding;
 import xjunz.tool.werecord.databinding.ItemSeparatorBinding;
 import xjunz.tool.werecord.impl.model.message.Message;
+import xjunz.tool.werecord.impl.model.message.SystemMessage;
 import xjunz.tool.werecord.impl.model.message.util.LvBufferUtils;
 import xjunz.tool.werecord.impl.repo.MessageRepository;
 import xjunz.tool.werecord.impl.repo.RepositoryFactory;
@@ -149,7 +150,7 @@ public class AdvancedEditorFragment extends EditorFragment {
             if (value instanceof byte[]) {
                 return Arrays.toString((byte[]) value);
             }
-            if (Message.KEY_CONTENT.equals(key) && value instanceof String && ((String) value).contains("<patMsg>")) {
+            if (Message.KEY_CONTENT.equals(key) && value instanceof String && SystemMessage.isPatMsgContent((String) value)) {
                 //拍一拍消息显示解析后的友好文本，而非原始XML
                 String parsed = mVictim.getParsedContent();
                 return parsed == null ? value.toString() : parsed;
