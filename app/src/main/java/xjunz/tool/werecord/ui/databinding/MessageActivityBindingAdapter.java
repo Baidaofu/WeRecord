@@ -155,10 +155,11 @@ public class MessageActivityBindingAdapter {
         activity.registerForContextMenu(view);
         float[] touchPos = new float[2];
         view.setOnTouchListener((v, event) -> {
+            //手动转交触摸事件以触发onClick，返回true避免View重复处理导致onClick触发两次
             view.onTouchEvent(event);
             touchPos[0] = event.getX();
             touchPos[1] = event.getY();
-            return false;
+            return true;
         });
         view.setOnClickListener(v -> {
             if (onClick != null) {

@@ -55,7 +55,6 @@
 
         <Button
             android:id="@+id/btn_execute"
-            style="@style/Widget.AppCompat.Button.Borderless.Colored"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/spacing_unit"
