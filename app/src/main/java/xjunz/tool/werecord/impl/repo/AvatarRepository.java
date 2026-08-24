@@ -12,6 +12,7 @@ import android.util.LruCache;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.jaredrummler.android.shell.CommandResult;
 import org.apaches.commons.codec.digest.DigestUtils;
 
 import java.io.ByteArrayOutputStream;
@@ -50,20 +51,57 @@ public class AvatarRepository extends LifecyclePerceptiveRepository {
     private Bitmap decodeAvatar(@NonNull String id) {
         String idMd5 = DigestUtils.md5Hex(id);
         String backupAvatarPath = getEnvironment().getAvatarBackupPath() + File.separator + idMd5;
-        String originalAvatarPath = getCurrentUser().dirPath + File.separator + "avatar" + File.separator
+        String avatarDir = getCurrentUser().dirPath + File.separator + "avatar" + File.separator
                 + idMd5.substring(0, 2) + File.separator
-                + idMd5.substring(2, 4) + File.separator
-                + "user_" + idMd5 + ".png";
+                + idMd5.substring(2, 4) + File.separator;
         try {
             File avatarFile = new File(backupAvatarPath);
             //如果头像不存在或已过期
             if (!avatarFile.exists() || (avatarFile.exists() && System.currentTimeMillis() - avatarFile.lastModified() > sAvatarExpiredTime)) {
-                ShellUtils.cp2dataIfExists(originalAvatarPath, backupAvatarPath, true);
+                //微信头像文件名存在多种格式（user_<md5>.png为旧版，新版本可能去掉前缀或改扩展名），依次尝试
+                String[] candidates = {
+                        "user_" + idMd5 + ".png",
+                        idMd5 + ".png",
+                        idMd5 + ".jpg",
+                        "th_" + idMd5 + ".png",
+                        idMd5
+                };
+                boolean copied = false;
+                for (String name : candidates) {
+                    if (ShellUtils.isFileExists(avatarDir + name)) {
+                        ShellUtils.cp2dataIfExists(avatarDir + name, backupAvatarPath, true);
+                        copied = true;
+                        break;
+                    }
+                }
+                //候选格式均未命中时，列出头像目录查找包含md5的文件（兼容未知命名格式）
+                if (!copied && (!avatarFile.exists() || avatarFile.length() == 0)) {
+                    scanAvatarDir(avatarDir, idMd5, backupAvatarPath);
+                }
             }
         } catch (ShellUtils.ShellException | IOException e) {
             LogUtils.error("Failed to load avatar of " + id + " :" + e.getMessage());
         }
         return BitmapFactory.decodeFile(backupAvatarPath);
+    }
+
+    /**
+     * 列出头像目录，找到文件名包含指定md5的文件并复制到本地（兼容新版微信未知的命名格式）
+     */
+    private void scanAvatarDir(@NonNull String avatarDir, @NonNull String idMd5, @NonNull String backupAvatarPath)
+            throws ShellUtils.ShellException, IOException {
+        CommandResult result = ShellUtils.sudo("ls", "-a", avatarDir);
+        String stdout = result.getStdout();
+        if (stdout == null) {
+            return;
+        }
+        for (String line : stdout.split("\n")) {
+            String name = line.trim();
+            if (name.length() > 0 && name.contains(idMd5)) {
+                ShellUtils.cp2dataIfExists(avatarDir + name, backupAvatarPath, true);
+                break;
+            }
+        }
     }
 
 
