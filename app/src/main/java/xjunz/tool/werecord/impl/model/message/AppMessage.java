@@ -38,6 +38,14 @@ public class AppMessage extends ComplexMessage {
     private String mAppId;
     private String mAppName;
     private int mSubtype;
+    /**
+     * 被回复的原始消息内容（refermsg.content）
+     */
+    private String mReferContent;
+    /**
+     * 被回复消息的发送者（refermsg.displayname，其次chatusr）
+     */
+    private String mReferSender;
     public static final int PARSE_ERROR_APP_XML = 3;
 
     public AppMessage(ContentValues values, MessageFactory.Type superType) {
@@ -141,11 +149,42 @@ public class AppMessage extends ComplexMessage {
         }
     }
 
+    /**
+     * @return 被回复的原始消息内容，非回复消息返回null
+     */
+    @Nullable
+    public String getReferContent() {
+        return mReferContent;
+    }
+
+    /**
+     * @return 被回复消息的发送者名称，无则返回null
+     */
+    @Nullable
+    public String getReferSender() {
+        return mReferSender;
+    }
+
+    @NonNull
+    @Override
+    public String getParsedContent() {
+        String base = super.getParsedContent();
+        if (mReferContent != null && mReferContent.length() > 0) {
+            String quote = (mReferSender == null || mReferSender.length() == 0 ? "" : mReferSender + "：") + mReferContent;
+            return base.length() == 0 ? "引用 " + quote : base + "\n引用 " + quote;
+        }
+        return base;
+    }
+
     private class ComplexMessageHandler extends DefaultHandler {
         private String currentLocalName;
         private final StringBuilder title = new StringBuilder();
         private StringBuilder des = new StringBuilder();
         private final StringBuilder type = new StringBuilder();
+        private boolean inReferMsg;
+        private String referCurrent;
+        private final StringBuilder referContent = new StringBuilder();
+        private final StringBuilder referSender = new StringBuilder();
 
         @Override
         public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
@@ -154,6 +193,12 @@ public class AppMessage extends ComplexMessage {
             if (Objects.equals(localName, "appmsg")) {
                 mAppId = attributes.getValue("appid");
                 mAppName = RepositoryFactory.get(WxAppRepository.class).getNameOf(mAppId);
+            } else if (Objects.equals(localName, "refermsg")) {
+                inReferMsg = true;
+            } else if (inReferMsg && Objects.equals(localName, "content")) {
+                referCurrent = "content";
+            } else if (inReferMsg && (Objects.equals(localName, "displayname") || Objects.equals(localName, "chatusr"))) {
+                referCurrent = "sender";
             }
         }
 
@@ -175,10 +220,14 @@ public class AppMessage extends ComplexMessage {
                         throw new StopParseException();
                     }
                 case "type":
+                    if (inReferMsg) {
+                        //refermsg内的type是被回复消息的类型，忽略
+                        break;
+                    }
                     try {
                         setRawSubtype(Integer.parseInt(type.toString()));
-                        //如果是文件的话，我们还要解析totallen节点，先不停止解析
-                        if (mSubtype != MessageFactory.SUBTYPE_FILE) {
+                        //文件类型需要解析totallen，回复消息需要解析refermsg，这两种情况继续解析
+                        if (mSubtype != MessageFactory.SUBTYPE_FILE && mSubtype != MessageFactory.SUBTYPE_REPLY) {
                             throw new StopParseException();
                         } else {
                             des = new StringBuilder();
@@ -186,6 +235,20 @@ public class AppMessage extends ComplexMessage {
                     } catch (NumberFormatException e) {
                         e.printStackTrace();
                         throw new StopParseException();
+                    }
+                    break;
+                case "refermsg":
+                    inReferMsg = false;
+                    mReferContent = referContent.length() == 0 ? null : referContent.toString();
+                    mReferSender = referSender.length() == 0 ? null : referSender.toString();
+                    break;
+                case "content":
+                    referCurrent = null;
+                    break;
+                case "displayname":
+                case "chatusr":
+                    if (inReferMsg) {
+                        referCurrent = null;
                     }
                     break;
             }
@@ -203,6 +266,14 @@ public class AppMessage extends ComplexMessage {
         @Override
         public void characters(char[] ch, int start, int length) throws SAXException {
             super.characters(ch, start, length);
+            if (inReferMsg) {
+                if ("content".equals(referCurrent)) {
+                    referContent.append(ch, start, length);
+                } else if ("sender".equals(referCurrent)) {
+                    referSender.append(ch, start, length);
+                }
+                return;
+            }
             switch (currentLocalName) {
                 case "title":
                     title.append(ch, start, length);
@@ -233,6 +304,8 @@ public class AppMessage extends ComplexMessage {
         dest.writeString(this.mAppId);
         dest.writeString(this.mAppName);
         dest.writeInt(this.mSubtype);
+        dest.writeString(this.mReferContent);
+        dest.writeString(this.mReferSender);
     }
 
     protected AppMessage(Parcel in) {
@@ -242,6 +315,8 @@ public class AppMessage extends ComplexMessage {
         this.mAppId = in.readString();
         this.mAppName = in.readString();
         this.mSubtype = in.readInt();
+        this.mReferContent = in.readString();
+        this.mReferSender = in.readString();
     }
 
     public static final Creator<AppMessage> CREATOR = new Creator<AppMessage>() {

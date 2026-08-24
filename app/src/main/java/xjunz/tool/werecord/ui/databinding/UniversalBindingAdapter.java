@@ -5,10 +5,12 @@ package xjunz.tool.werecord.ui.databinding;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
+import android.graphics.Bitmap;
 import android.text.InputFilter;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -26,7 +28,11 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
+import io.reactivex.schedulers.Schedulers;
 import xjunz.tool.werecord.R;
+import xjunz.tool.werecord.impl.model.message.Message;
+import xjunz.tool.werecord.util.MessageImageLoader;
+import xjunz.tool.werecord.util.RxJavaUtils;
 import xjunz.tool.werecord.util.UiUtils;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -42,6 +48,40 @@ public class UniversalBindingAdapter {
     @BindingAdapter("android:visible")
     public static void setVisible(@NotNull View view, boolean isVisible) {
         view.setVisibility(isVisible ? View.VISIBLE : View.GONE);
+    }
+
+    /**
+     * 异步加载消息图片（缩略图），失败或无图时隐藏。
+     * 绑定到气泡布局的ImageView：android:msgImage="@{msg}"
+     */
+    @BindingAdapter(value = {"android:msgImage"})
+    public static void setMsgImage(@NotNull ImageView imageView, Message oldMessage, Message message) {
+        String path = message == null ? null : message.getLocalImagePath();
+        if (path == null) {
+            imageView.setVisibility(View.GONE);
+            imageView.setImageDrawable(null);
+            return;
+        }
+        imageView.setVisibility(View.VISIBLE);
+        imageView.setTag(path);
+        RxJavaUtils.maybe(() -> MessageImageLoader.load(path)).subscribeOn(Schedulers.io())
+                .subscribe(new RxJavaUtils.MaybeObserverAdapter<Bitmap>() {
+                    @Override
+                    public void onSuccess(@NotNull Bitmap bitmap) {
+                        if (path.equals(imageView.getTag())) {
+                            imageView.setImageBitmap(bitmap);
+                        }
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        //加载失败（如微信缓存已被清理），隐藏图片
+                        if (path.equals(imageView.getTag())) {
+                            imageView.setImageDrawable(null);
+                            imageView.setVisibility(View.GONE);
+                        }
+                    }
+                });
     }
 
     @BindingAdapter("android:invisible")
