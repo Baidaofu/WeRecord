@@ -76,7 +76,7 @@
                 android:id="@+id/rv_zombies"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_below="@+id/tv_caption"
+                android:layout_below="@+id/tv_note"
                 android:layout_marginTop="8dp"
                 android:invisible="@{!host.foundZombies}"
                 android:overScrollMode="never"

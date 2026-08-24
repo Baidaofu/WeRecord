@@ -176,10 +176,10 @@ public class DebugActivity extends BaseActivity {
             tmpFile.delete();
             String internal = tmpFile.getAbsolutePath();
             net.sqlcipher.database.SQLiteDatabase src = mEnv.getWorkerDatabase();
-            //创建未加密的独立数据库并复制指定表
-            src.execSQL("ATTACH DATABASE '" + internal + "' AS export_db KEY ''");
-            src.execSQL("CREATE TABLE export_db." + tableName + " AS SELECT * FROM main." + tableName);
-            src.execSQL("DETACH DATABASE export_db");
+            //创建未加密的独立数据库，用sqlcipher_export复制指定表（与导出解密数据库同方案）
+            src.rawExecSQL("ATTACH DATABASE '" + internal + "' AS export_db KEY ''");
+            src.rawExecSQL("SELECT sqlcipher_export('export_db', '" + tableName + "');");
+            src.rawExecSQL("DETACH DATABASE export_db");
             //root复制到外部存储
             String tar = android.os.Environment.getExternalStorageDirectory() + File.separator + fileName;
             ShellUtils.cp(internal, tar);
