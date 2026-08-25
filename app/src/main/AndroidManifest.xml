@@ -75,6 +75,9 @@
             android:name="xjunz.tool.werecord.ui.main.ImageViewerActivity"
             android:theme="@style/Base.AppTheme.Main.Translucent.Dialog.ImageViewer" />
         <activity
+            android:name="xjunz.tool.werecord.ui.main.MediaViewerActivity"
+            android:theme="@style/Base.AppTheme.Main.Translucent.Dialog.ImageViewer" />
+        <activity
             android:name="xjunz.tool.werecord.ui.message.MessageActivity"
             android:theme="@style/Base.AppTheme.Main.Translucent.Message" />
         <activity

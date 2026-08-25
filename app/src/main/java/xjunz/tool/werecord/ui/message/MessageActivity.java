@@ -53,9 +53,12 @@ import xjunz.tool.werecord.databinding.ActivityMessageBinding;
 import xjunz.tool.werecord.impl.DatabaseModifier;
 import xjunz.tool.werecord.impl.Environment;
 import xjunz.tool.werecord.impl.model.account.Talker;
+import xjunz.tool.werecord.impl.model.account.User;
 import xjunz.tool.werecord.impl.model.message.ComplexMessage;
 import xjunz.tool.werecord.impl.model.message.Message;
+import xjunz.tool.werecord.impl.model.message.MessageFactory;
 import xjunz.tool.werecord.impl.model.message.SystemMessage;
+import xjunz.tool.werecord.impl.model.message.UnpreviewableMessage;
 import xjunz.tool.werecord.impl.model.message.util.Edition;
 import xjunz.tool.werecord.impl.model.message.util.Template;
 import xjunz.tool.werecord.impl.repo.MessageRepository;
@@ -70,8 +73,12 @@ import xjunz.tool.werecord.ui.message.fragment.StatisticsFragment;
 import xjunz.tool.werecord.ui.message.fragment.dialog.MessageViewerDialog;
 import xjunz.tool.werecord.ui.message.fragment.dialog.TemplateSetupDialog;
 import xjunz.tool.werecord.ui.viewmodel.MessageViewModel;
+import xjunz.tool.werecord.util.LogUtils;
+import xjunz.tool.werecord.util.MessageImageLoader;
 import xjunz.tool.werecord.util.RxJavaUtils;
+import xjunz.tool.werecord.util.ShellUtils;
 import xjunz.tool.werecord.util.UiUtils;
+import xjunz.tool.werecord.util.VoicePlayer;
 
 public class MessageActivity extends RecycleAwareActivity {
     public static final String EXTRA_TALKER = "MessageActivity.extra.talker";
@@ -446,6 +453,56 @@ public class MessageActivity extends RecycleAwareActivity {
         }
     }
 
+    private void playVoiceMessage(Message message) {
+        //点击播放语音：找到voice2目录中的amr文件，复制到本地后播放
+        final Long msgSvrId = message.getValues() == null ? null : message.getValues().getAsLong("msgSvrId");
+        LogUtils.debug("playVoice msgSvrId=" + msgSvrId);
+        if (msgSvrId == null) {
+            return;
+        }
+        RxJavaUtils.maybe(() -> {
+            User user = Environment.getInstance().getCurrentUser();
+            if (user == null) {
+                LogUtils.debug("playVoice: user null, voiceCachePath=" + (user == null ? "N/A" : user.voiceCachePath));
+                return null;
+            }
+            LogUtils.debug("playVoice: searching in " + user.voiceCachePath);
+            //扫描voice2目录找语音文件（分目录规则未知，用find按文件名搜索）
+            try {
+                com.jaredrummler.android.shell.CommandResult result = ShellUtils.sudo("find", user.voiceCachePath, "-name", "msg_" + msgSvrId + "_m.amr");
+                String stdout = result.getStdout();
+                LogUtils.debug("playVoice find result: " + stdout);
+                if (stdout != null) {
+                    for (String line : stdout.split("\n")) {
+                        String path = line.trim();
+                        if (path.length() > 0) {
+                            String local = MessageImageLoader.copyToLocal(path);
+                            LogUtils.debug("playVoice copied: " + local);
+                            if (local != null) {
+                                return local;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                LogUtils.error("playVoice find exception: " + e);
+            }
+            return null;
+        }).subscribe(new RxJavaUtils.MaybeObserverAdapter<String>() {
+            @Override
+            public void onSuccess(@NotNull String path) {
+                LogUtils.debug("playVoice toggle: " + path);
+                VoicePlayer.toggle(path);
+            }
+
+            @Override
+            public void onComplete() {
+                LogUtils.debug("playVoice: file not found");
+                MasterToast.shortToast("该语音未缓存，请先在微信中播放一次");
+            }
+        });
+    }
+
     private static class EditorResult {
         private final Message editedMessage;
         private final int editMode;
@@ -779,6 +836,13 @@ public class MessageActivity extends RecycleAwareActivity {
             holder.binding.setVariable(BR.msg, message);
             holder.binding.setVariable(BR.vh, holder);
             holder.binding.executePendingBindings();
+            //语音消息：点击气泡播放语音（其他消息点击无动作，长按弹菜单）
+            if (message instanceof UnpreviewableMessage && message.getType() == MessageFactory.Type.VOICE) {
+                View container = holder.binding.getRoot().findViewById(R.id.msg_container);
+                if (container != null) {
+                    container.setOnClickListener(v -> playVoiceMessage(message));
+                }
+            }
         }
 
         @Override

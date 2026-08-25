@@ -120,6 +120,53 @@ public class MessageImageLoader {
     }
 
     /**
+     * 将微信缓存中的媒体文件复制到应用私有目录，返回本地副本路径（供播放/查看使用）。
+     * 复制失败返回null。
+     */
+    @Nullable
+    public static String copyToLocal(@Nullable String path) {
+        if (path == null || path.length() == 0) {
+            return null;
+        }
+        File cacheDir = new File(App.getContext().getFilesDir(), CACHE_DIR_NAME);
+        if (!cacheDir.exists() && !cacheDir.mkdirs()) {
+            return null;
+        }
+        String backupPath = cacheDir + File.separator + DigestUtils.md5Hex(path);
+        File backup = new File(backupPath);
+        if (!backup.exists()) {
+            try {
+                ShellUtils.cp2dataIfExists(path, backupPath, false);
+            } catch (IOException | ShellUtils.ShellException e) {
+                return null;
+            }
+        }
+        return backup.exists() ? backupPath : null;
+    }
+
+    /**
+     * 依次尝试候选路径，复制第一个成功解码的图片到本地并返回其路径（视频/GIF等非图片跳过）。
+     * 全部失败返回null。
+     */
+    @Nullable
+    public static String copyFirstToLocal(@Nullable String[] paths) {
+        if (paths == null) {
+            return null;
+        }
+        for (String path : paths) {
+            String local = copyToLocal(path);
+            if (local != null) {
+                //跳过无法解码的文件（如加密表情、视频文件本身）
+                Bitmap bitmap = BitmapFactory.decodeFile(local);
+                if (bitmap != null) {
+                    return local;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
      * 加载指定路径的图片，缓存于应用私有目录。
      *
      * @param path 微信缓存中的图片路径（如缩略图路径）

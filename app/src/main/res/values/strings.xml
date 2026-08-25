@@ -208,6 +208,7 @@
     <string name="no_function_selected">未选择功能</string>
     <string name="confirm_execute_question">确定要执行该功能吗？</string>
     <string name="confirm">确定</string>
+    <string name="load_original">加载原图</string>
     <string name="apply_changes">应用更改</string>
     <string name="press_again_to_quit">再次点击以退出</string>
     <string name="edit_send_timestamp">编辑发送时间</string>

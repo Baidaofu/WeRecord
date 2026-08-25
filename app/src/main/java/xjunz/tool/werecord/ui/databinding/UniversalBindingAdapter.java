@@ -5,7 +5,9 @@ package xjunz.tool.werecord.ui.databinding;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
+import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.text.InputFilter;
 import android.view.View;
 import android.view.ViewGroup;
@@ -31,6 +33,7 @@ import java.lang.reflect.Method;
 import io.reactivex.schedulers.Schedulers;
 import xjunz.tool.werecord.R;
 import xjunz.tool.werecord.impl.model.message.Message;
+import xjunz.tool.werecord.ui.main.MediaViewerActivity;
 import xjunz.tool.werecord.util.MessageImageLoader;
 import xjunz.tool.werecord.util.RxJavaUtils;
 import xjunz.tool.werecord.util.UiUtils;
@@ -64,18 +67,30 @@ public class UniversalBindingAdapter {
         }
         imageView.setVisibility(View.VISIBLE);
         imageView.setTag(paths);
-        RxJavaUtils.maybe(() -> MessageImageLoader.loadAny(paths)).subscribeOn(Schedulers.io())
-                .subscribe(new RxJavaUtils.MaybeObserverAdapter<Bitmap>() {
+        RxJavaUtils.maybe(() -> MessageImageLoader.copyFirstToLocal(paths)).subscribeOn(Schedulers.io())
+                .subscribe(new RxJavaUtils.MaybeObserverAdapter<String>() {
                     @Override
-                    public void onSuccess(@NotNull Bitmap bitmap) {
+                    public void onSuccess(@NotNull String localPath) {
                         if (paths == imageView.getTag()) {
-                            imageView.setImageBitmap(bitmap);
+                            Bitmap bitmap = BitmapFactory.decodeFile(localPath);
+                            if (bitmap != null) {
+                                imageView.setImageBitmap(bitmap);
+                                //点击放大预览（图片/表情/视频/GIF）
+                                imageView.setOnClickListener(v -> {
+                                    Intent intent = new Intent(v.getContext(), MediaViewerActivity.class);
+                                    intent.putExtra(MediaViewerActivity.EXTRA_MSG, message);
+                                    intent.putExtra(MediaViewerActivity.EXTRA_THUMB, localPath);
+                                    v.getContext().startActivity(intent);
+                                });
+                            } else {
+                                imageView.setVisibility(View.GONE);
+                            }
                         }
                     }
 
                     @Override
                     public void onComplete() {
-                        //加载失败（如微信缓存已被清理），隐藏图片
+                        //加载失败（如微信缓存已被清理/加密），隐藏图片
                         if (paths == imageView.getTag()) {
                             imageView.setImageDrawable(null);
                             imageView.setVisibility(View.GONE);

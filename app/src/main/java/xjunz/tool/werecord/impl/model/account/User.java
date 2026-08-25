@@ -35,6 +35,7 @@ public class User extends Account {
     public final String imageCachePath;
     public final String videoCachePath;
     public final String emojiCachePath;
+    public final String voiceCachePath;
     public boolean isLastLogin;
     public String uin;
     public String phoneNum;
@@ -49,6 +50,7 @@ public class User extends Account {
         this.imageCachePath = dirPath + File.separator + "image2";
         this.videoCachePath = dirPath + File.separator + "video";
         this.emojiCachePath = dirPath + File.separator + "emoji";
+        this.voiceCachePath = dirPath + File.separator + "voice2";
     }
 
     public void deleteWorkerDatabase() {
@@ -100,6 +102,7 @@ public class User extends Account {
         dest.writeString(this.imageCachePath);
         dest.writeString(this.videoCachePath);
         dest.writeString(this.emojiCachePath);
+        dest.writeString(this.voiceCachePath);
         dest.writeByte(this.isLastLogin ? (byte) 1 : (byte) 0);
         dest.writeString(this.uin);
     }
@@ -114,6 +117,7 @@ public class User extends Account {
         this.imageCachePath = in.readString();
         this.videoCachePath = in.readString();
         this.emojiCachePath = in.readString();
+        this.voiceCachePath = in.readString();
         this.isLastLogin = in.readByte() != 0;
         this.uin = in.readString();
     }

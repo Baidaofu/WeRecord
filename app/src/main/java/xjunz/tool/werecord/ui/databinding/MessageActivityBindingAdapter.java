@@ -162,20 +162,22 @@ public class MessageActivityBindingAdapter {
             return true;
         });
         view.setOnClickListener(v -> {
+            //点击不再弹出操作菜单（改为长按弹出）
             if (onClick != null) {
                 onClick.run();
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                v.showContextMenu(touchPos[0], touchPos[1]);
-            } else {
-                v.showContextMenu();
             }
         });
         view.setOnLongClickListener(v -> {
             if (onClick != null) {
                 onClick.run();
             }
-            return false;
+            //长按弹出操作菜单
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                v.showContextMenu(touchPos[0], touchPos[1]);
+            } else {
+                v.showContextMenu();
+            }
+            return true;
         });
     }
 
