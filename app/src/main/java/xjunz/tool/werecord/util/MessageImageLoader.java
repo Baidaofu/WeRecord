@@ -182,6 +182,11 @@ public class MessageImageLoader {
         }
         String backupPath = cacheDir + File.separator + DigestUtils.md5Hex(path);
         File backup = new File(backupPath);
+        if (backup.exists() && backup.length() == 0) {
+            //残留空文件（此前cp失败留下），删除以便重新复制，避免缓存毒化
+            //noinspection ResultOfMethodCallIgnored
+            backup.delete();
+        }
         if (!backup.exists()) {
             try {
                 ShellUtils.cp2dataIfExists(path, backupPath, false);
@@ -190,8 +195,12 @@ public class MessageImageLoader {
                 return null;
             }
         }
-        LogUtils.debug("copyToLocal: " + path + " -> " + backupPath + " exists=" + backup.exists());
-        return backup.exists() ? backupPath : null;
+        if (!backup.exists() || backup.length() == 0) {
+            LogUtils.debug("copyToLocal empty/missing: " + path);
+            return null;
+        }
+        LogUtils.debug("copyToLocal: " + path + " -> " + backupPath + " size=" + backup.length());
+        return backupPath;
     }
 
     /**

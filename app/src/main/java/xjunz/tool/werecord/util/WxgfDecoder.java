@@ -40,11 +40,21 @@ public class WxgfDecoder {
             if (headerLen >= data.length) {
                 return null;
             }
-            int start = findStartCode(data, headerLen);
-            if (start < 0) {
+            //收集所有有效分区（start code前4字节为长度，校验合法性），取最大分区（图片主体）
+            List<int[]> parts = findPartitions(data, headerLen);
+            if (parts.isEmpty()) {
                 return null;
             }
-            byte[] nalStream = Arrays.copyOfRange(data, start, data.length);
+            int maxIdx = 0;
+            for (int i = 1; i < parts.size(); i++) {
+                if (parts.get(i)[1] > parts.get(maxIdx)[1]) {
+                    maxIdx = i;
+                }
+            }
+            int off = parts.get(maxIdx)[0];
+            int len = parts.get(maxIdx)[1];
+            LogUtils.debug("wxgf parts=" + parts.size() + " pick off=" + off + " len=" + len + " total=" + data.length);
+            byte[] nalStream = Arrays.copyOfRange(data, off, off + len);
             return decodeHevcToBitmap(nalStream);
         } catch (Exception e) {
             LogUtils.error("wxgf decode exception: " + e);
@@ -52,24 +62,45 @@ public class WxgfDecoder {
         }
     }
 
-    private static int findStartCode(byte[] data, int from) {
-        for (int i = from; i + 3 < data.length; i++) {
+    /**
+     * 收集所有有效数据分区[offset, length]：从头部偏移起查找start code，
+     * 校验其前4字节长度字段（0<len且不越界），跳过无效候选（如数据中误匹配的00000001）。
+     */
+    private static List<int[]> findPartitions(byte[] data, int from) {
+        List<int[]> parts = new ArrayList<>();
+        int n = data.length;
+        int i = from;
+        while (i + 3 < n) {
             if (data[i] == 0 && data[i + 1] == 0 && data[i + 2] == 0 && data[i + 3] == 1) {
-                return i;
+                int len = ((data[i - 4] & 0xFF) << 24) | ((data[i - 3] & 0xFF) << 16)
+                        | ((data[i - 2] & 0xFF) << 8) | (data[i - 1] & 0xFF);
+                if (len > 0 && i + len <= n) {
+                    parts.add(new int[]{i, len});
+                    i += len;
+                } else {
+                    i += 4;
+                }
+            } else if (data[i] == 0 && data[i + 1] == 0 && data[i + 2] == 1) {
+                int len = ((data[i - 4] & 0xFF) << 24) | ((data[i - 3] & 0xFF) << 16)
+                        | ((data[i - 2] & 0xFF) << 8) | (data[i - 1] & 0xFF);
+                if (len > 0 && i + len <= n) {
+                    parts.add(new int[]{i, len});
+                    i += len;
+                } else {
+                    i += 3;
+                }
+            } else {
+                i++;
             }
         }
-        for (int i = from; i + 2 < data.length; i++) {
-            if (data[i] == 0 && data[i + 1] == 0 && data[i + 2] == 1) {
-                return i;
-            }
-        }
-        return -1;
+        return parts;
     }
 
     @Nullable
     private static Bitmap decodeHevcToBitmap(byte[] nalStream) {
         List<byte[]> nals = splitNals(nalStream);
         if (nals.isEmpty()) {
+            LogUtils.debug("wxgf splitNals empty, stream len=" + nalStream.length);
             return null;
         }
         ByteBuffer csd = ByteBuffer.allocate(nalStream.length);
@@ -90,10 +121,12 @@ public class WxgfDecoder {
             }
         }
         if (frameNals.isEmpty()) {
+            LogUtils.debug("wxgf no VCL frames, nals=" + nals.size() + " csd=" + csd.position());
             return null;
         }
         byte[] csdBytes = new byte[csd.position()];
         System.arraycopy(csd.array(), 0, csdBytes, 0, csdBytes.length);
+        LogUtils.debug("wxgf nals=" + nals.size() + " csd=" + csdBytes.length + " frames=" + frameNals.size());
         return decodeWithCodec(csdBytes, frameNals);
     }
 
@@ -112,10 +145,12 @@ public class WxgfDecoder {
             //所有VCL帧合并为一个buffer喂入（AnnexB流）
             int inIndex = codec.dequeueInputBuffer(1_000_000);
             if (inIndex < 0) {
+                LogUtils.debug("wxgf dequeueInputBuffer timeout, frames=" + frameNals.size());
                 return null;
             }
             ByteBuffer inBuf = codec.getInputBuffer(inIndex);
             if (inBuf == null) {
+                LogUtils.debug("wxgf inputBuffer null");
                 return null;
             }
             inBuf.clear();
@@ -128,9 +163,11 @@ public class WxgfDecoder {
                 inOffset += nal.length;
             }
             if (inOffset == 0) {
+                LogUtils.debug("wxgf input empty");
                 return null;
             }
             codec.queueInputBuffer(inIndex, 0, inOffset, 0, 0);
+            LogUtils.debug("wxgf queued input offset=" + inOffset);
             //结束标记
             int eosIndex = codec.dequeueInputBuffer(10_000);
             if (eosIndex >= 0) {
@@ -162,6 +199,9 @@ public class WxgfDecoder {
                 } else if (outIndex == MediaCodec.INFO_TRY_AGAIN_LATER) {
                     //不再解码，等待超时
                 }
+            }
+            if (result == null) {
+                LogUtils.debug("wxgf decode timeout, no output");
             }
             return result;
         } catch (Exception e) {

@@ -216,7 +216,7 @@ public class MediaViewerActivity extends RecycleAwareActivity {
     }
 
     private static byte[] readFile(@Nullable File file) {
-        if (file == null || !file.exists()) {
+        if (file == null || !file.exists() || file.length() == 0) {
             return null;
         }
         try (FileInputStream fis = new FileInputStream(file)) {
