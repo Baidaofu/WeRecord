@@ -35,6 +35,9 @@ import xjunz.tool.werecord.impl.repo.RepositoryFactory;
 import xjunz.tool.werecord.util.DbUtils;
 import xjunz.tool.werecord.util.Utils;
 
+import net.sqlcipher.Cursor;
+import net.sqlcipher.database.SQLiteDatabase;
+
 /**
  * 消息对象，是数据库中"message"表的数据的封装。所有消息来源于{@link MessageFactory#createMessage(ContentValues)}。
  * 需要注意的是，消息中所有数字类型的字段都是{@link Long}类型。
@@ -496,8 +499,47 @@ public abstract class Message implements Parcelable, Exportable {
                     }
                 }
             }
+            //imgPath字段不可用时，从ImgInfo2表按msgSvrId查真实缩略图路径（新版微信缓存文件名md5与消息md5不同）
+            if (localImagePath == null) {
+                String thumbMd5 = queryImgInfo2ThumbMd5();
+                if (thumbMd5 != null && thumbMd5.length() >= 4) {
+                    localImagePath = user.imageCachePath + File.separator
+                            + thumbMd5.substring(0, 2) + File.separator
+                            + thumbMd5.substring(2, 4) + File.separator
+                            + "th_" + thumbMd5;
+                }
+            }
         }
         return localImagePath;
+    }
+
+    /**
+     * 从ImgInfo2表按msgSvrId查询真实缩略图文件名（THUMBNAIL_DIRPATH://th_&lt;md5&gt;），
+     * 返回md5；无记录或查询失败返回null。
+     */
+    @Nullable
+    private String queryImgInfo2ThumbMd5() {
+        Long msgSvrId = values.getAsLong("msgSvrId");
+        if (msgSvrId == null) {
+            return null;
+        }
+        try {
+            SQLiteDatabase db = Environment.getInstance().getWorkerDatabase();
+            if (db == null || !db.isOpen()) {
+                return null;
+            }
+            try (Cursor cursor = db.rawQuery("SELECT thumbImgPath FROM ImgInfo2 WHERE msgSvrId=" + msgSvrId + " LIMIT 1", null)) {
+                if (cursor.moveToFirst()) {
+                    String thumb = cursor.getString(0);
+                    if (thumb != null && thumb.startsWith("THUMBNAIL_DIRPATH://th_")) {
+                        return thumb.substring("THUMBNAIL_DIRPATH://th_".length());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            //查询失败时忽略，返回null走其他候选
+        }
+        return null;
     }
 
     private static final Pattern IMG_MD5_PATTERN = Pattern.compile("md5=\"([0-9a-fA-F]{32})\"");
@@ -517,9 +559,10 @@ public abstract class Message implements Parcelable, Exportable {
         if (imgMatcher.find()) {
             return imgMatcher.group(1);
         }
-        Matcher emojiMatcher = EMOJI_MD5_PATTERN.matcher(content.trim());
-        if (emojiMatcher.find()) {
-            return emojiMatcher.group(1);
+        //表情等冒号格式：wxid:0:0:<md5>:...（第4段为32位hex，结尾格式多样如*#*或<msg>...）
+        String[] parts = content.split(":");
+        if (parts.length >= 4 && parts[3].matches("[0-9a-fA-F]{32}")) {
+            return parts[3];
         }
         return null;
     }
@@ -538,6 +581,9 @@ public abstract class Message implements Parcelable, Exportable {
         String fromImgPath = getLocalImagePath();
         if (fromImgPath != null) {
             candidates.add(fromImgPath);
+            //从imgPath解析出的md5扩充变体（_tmp.jpg/.jpg/.png/hd等）
+            String md5FromPath = extractMd5FromImagePath(fromImgPath);
+            addMediaCandidates(candidates, user, md5FromPath);
         }
         //视频消息：imgpath为纯数字（视频ID）时，在video目录构造候选路径
         String imgPath = getImgPath();
@@ -549,23 +595,55 @@ public abstract class Message implements Parcelable, Exportable {
             candidates.add(user.videoCachePath + File.separator + "th_" + imgPath);
             candidates.add(user.videoCachePath + File.separator + "th_" + imgPath + ".jpg");
         }
-        String md5 = extractMediaMd5FromContent();
-        if (md5 != null && md5.length() >= 4) {
-            String base = user.imageCachePath + File.separator + md5.substring(0, 2) + File.separator + md5.substring(2, 4);
-            //缩略图与原图
-            candidates.add(base + File.separator + "th_" + md5);
-            candidates.add(base + File.separator + md5);
-            //表情目录
-            String emoji = user.emojiCachePath + File.separator + md5;
-            candidates.add(emoji);
-            candidates.add(emoji + ".gif");
-            //视频目录（视频缩略图/视频文件）
-            String video = user.videoCachePath + File.separator + md5;
-            candidates.add(video + ".jpg");
-            candidates.add(video);
-            candidates.add(user.videoCachePath + File.separator + "th_" + md5);
-        }
+        //消息content中提取的md5候选
+        addMediaCandidates(candidates, user, extractMediaMd5FromContent());
         return candidates.toArray(new String[0]);
+    }
+
+    /**
+     * 从图片路径中提取md5（取路径中最后一个32位hex，避免MicroMsg目录hash干扰）
+     */
+    @Nullable
+    private static String extractMd5FromImagePath(@Nullable String path) {
+        if (path == null) {
+            return null;
+        }
+        //贪婪匹配.*使得分组取到最后一个32位hex
+        Matcher matcher = Pattern.compile(".*([0-9a-fA-F]{32})").matcher(path);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return null;
+    }
+
+    /**
+     * 为给定md5生成媒体缓存候选路径（覆盖完成/临时/各扩展名/高清变体）
+     */
+    private static void addMediaCandidates(@NonNull List<String> candidates, @NonNull User user, @Nullable String md5) {
+        if (md5 == null || md5.length() < 4) {
+            return;
+        }
+        String base = user.imageCachePath + File.separator + md5.substring(0, 2) + File.separator + md5.substring(2, 4);
+        //图片：缩略图/原图，含临时文件与扩展名变体（新版微信可能有_tmp.jpg后缀、.jpg/.png扩展名）
+        candidates.add(base + File.separator + "th_" + md5);
+        candidates.add(base + File.separator + "th_" + md5 + "_tmp.jpg");
+        candidates.add(base + File.separator + md5);
+        candidates.add(base + File.separator + md5 + ".jpg");
+        candidates.add(base + File.separator + md5 + ".png");
+        candidates.add(base + File.separator + "th_" + md5 + "hd");
+        candidates.add(base + File.separator + "th_" + md5 + "hd_tmp.jpg");
+        //表情目录（decrypt子目录为解密后的明文，优先尝试；根目录/表情包子目录可能是加密数据）
+        String emojiDecrypt = user.emojiCachePath + File.separator + "decrypt" + File.separator + md5;
+        candidates.add(emojiDecrypt);
+        String emoji = user.emojiCachePath + File.separator + md5;
+        candidates.add(emoji);
+        candidates.add(emoji + ".gif");
+        candidates.add(emoji + ".png");
+        //视频目录（视频缩略图/视频文件）
+        String video = user.videoCachePath + File.separator + md5;
+        candidates.add(video + ".jpg");
+        candidates.add(video);
+        candidates.add(user.videoCachePath + File.separator + "th_" + md5);
     }
 
     public String getRawContent() {
