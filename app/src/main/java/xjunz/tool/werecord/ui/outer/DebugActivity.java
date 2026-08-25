@@ -49,6 +49,9 @@ public class DebugActivity extends BaseActivity {
         mEtOutput = findViewById(R.id.et_output);
         mTvSelected = findViewById(R.id.tv_selected);
         mTvDesc = findViewById(R.id.tv_desc);
+        //用代码绑定点击事件，避免XML android:onClick反射在混淆(release)构建下找不到方法而崩溃
+        findViewById(R.id.btn_select).setOnClickListener(this::onSelectFunction);
+        findViewById(R.id.btn_execute).setOnClickListener(this::onExecute);
     }
 
     /**

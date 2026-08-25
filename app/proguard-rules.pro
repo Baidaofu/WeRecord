@@ -25,3 +25,11 @@
 -keep class com.google.crypto.**{ *; }
 #FilterFragment.onPrepareFilter()
 -keepclassmembers class androidx.appcompat.widget.AppCompatSpinner{private <fields>;}
+
+# 保留Activity中通过XML android:onClick="methodName" 反射调用的方法（混淆构建下避免崩溃）
+-keepclassmembers class * extends android.app.Activity {
+    public void *(android.view.View);
+}
+-keepclassmembers class * extends androidx.fragment.app.DialogFragment {
+    public void *(android.view.View);
+}
