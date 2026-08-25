@@ -17,7 +17,7 @@
         android:title="@string/edit" />
     <item
         android:id="@+id/item_check"
-        android:title="@string/check" />
+        android:title="@string/check_message" />
     <item
         android:id="@+id/item_restore"
         android:title="@string/restore" />

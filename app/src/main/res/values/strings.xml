@@ -164,6 +164,7 @@
     <string name="delete">删除</string>
     <string name="edit">编辑</string>
     <string name="check">查看</string>
+    <string name="check_message">检查</string>
     <string name="has_reached_the_top">到顶啦</string>
     <string name="has_copied_to_clipboard">已复制到剪贴板</string>
     <string name="copy_title">复制标题</string>
