@@ -72,23 +72,13 @@ public class ActivityUtils {
     }
 
     public static void feedbackAutoFallback(Context context, String errorLog) {
-        if (Constants.USER_DEBUGGABLE) {
-            if (!viewUri(context, Constants.URI_LAUNCH_QQ_TEMP_CHAT)) {
-                feedbackEmail(context, errorLog);
-            }
-        } else {
-            if (!viewUri(context, Constants.URI_JOIN_QQ_FEEDBACK_QQ_GROUP)) {
-                feedbackEmail(context, errorLog);
-            }
-        }
+        //统一走邮箱反馈
+        feedbackEmail(context, errorLog);
     }
 
     public static void feedbackJoinQGroup(Context context) {
-        try {
-            context.startActivity(new Intent().setData(Uri.parse(Constants.URI_JOIN_QQ_FEEDBACK_QQ_GROUP)));
-        } catch (Exception e) {
-            MasterToast.shortToast(R.string.operation_failed);
-        }
+        //已移除QQ群反馈，改为邮箱
+        feedbackEmail(context, "");
     }
 
     public static void launchVictim(@NotNull Context context) {

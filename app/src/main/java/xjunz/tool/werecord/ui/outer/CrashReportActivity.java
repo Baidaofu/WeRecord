@@ -91,6 +91,7 @@ public class CrashReportActivity extends AppCompatActivity {
     }
 
     public void joinFeedbackGroup(View view) {
-        ActivityUtils.feedbackJoinQGroup(this);
+        //已移除QQ群反馈，改为邮箱发送崩溃日志
+        send(view);
     }
 }

@@ -425,7 +425,8 @@ public class MessageActivity extends RecycleAwareActivity {
         super.onCreateContextMenu(menu, v, menuInfo);
         getMenuInflater().inflate(R.menu.message, menu);
         menu.setHeaderTitle(R.string.operation);
-        menu.findItem(R.id.item_check).setVisible(Constants.USER_DEBUGGABLE);
+        //检查项始终可见（查看消息原始数据）
+        menu.findItem(R.id.item_check).setVisible(true);
         //如果消息未编辑
         if (!mSelectedMsg.isEdited()) {
             //禁用还原
