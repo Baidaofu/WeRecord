@@ -32,6 +32,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/dp_12"
+            android:ellipsize="end"
+            android:singleLine="true"
             android:text="@{item.message.senderAccount.name??@string/msg_type_system}"
             android:textColor="?colorAccent"
             app:layout_constraintEnd_toStartOf="@+id/tv_date"

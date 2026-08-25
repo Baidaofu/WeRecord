@@ -39,6 +39,8 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/spacing_normal"
             android:layout_marginTop="@dimen/spacing_normal"
+            android:ellipsize="end"
+            android:singleLine="true"
             android:text="@{item.showcase.senderAccount.name??@string/msg_type_system}"
             android:textColor="?colorAccent"
             app:layout_constraintStart_toStartOf="parent"

@@ -49,6 +49,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
+            android:ellipsize="end"
+            android:singleLine="true"
             android:text="@{stat.name}"
             app:layout_constraintStart_toEndOf="@+id/civ_avatar"
             app:layout_constraintTop_toTopOf="@+id/civ_avatar"

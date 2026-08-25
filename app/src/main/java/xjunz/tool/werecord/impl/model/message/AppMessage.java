@@ -32,6 +32,7 @@ import xjunz.tool.werecord.impl.model.account.Contact;
 import xjunz.tool.werecord.impl.repo.ContactRepository;
 import xjunz.tool.werecord.impl.repo.RepositoryFactory;
 import xjunz.tool.werecord.impl.repo.WxAppRepository;
+import xjunz.tool.werecord.util.LogUtils;
 
 /**
  * AppMessage是可以在"AppMessage"表中查询到记录的消息类型。
@@ -153,7 +154,13 @@ public class AppMessage extends ComplexMessage {
         String base = mDes;
         if (mReferContent != null && mReferContent.length() > 0) {
             //附加被引用消息内容，使气泡的description区域显示引用块
-            String quote = (mReferSender == null || mReferSender.length() == 0 ? "" : mReferSender + "：") + mReferContent;
+            //被回复人昵称过长时截断为单行，避免引用块撑得过长；trim去除空白昵称
+            String sender = mReferSender == null ? null : mReferSender.trim();
+            if (sender != null && sender.length() > 12) {
+                sender = sender.substring(0, 12) + "…";
+            }
+            LogUtils.debug("refer sender raw=" + mReferSender + " -> " + sender + " referContentLen=" + mReferContent.length());
+            String quote = (sender == null || sender.length() == 0 ? "" : sender + "：") + mReferContent;
             return base == null || base.length() == 0 ? "引用 " + quote : base + "\n引用 " + quote;
         }
         return base;
@@ -286,15 +293,16 @@ public class AppMessage extends ComplexMessage {
                 case "refermsg":
                     inReferMsg = false;
                     mReferContent = referContent.length() == 0 ? null : purifyReferContent(referContent.toString());
-                    String displayName = referSender.length() == 0 ? null : referSender.toString();
-                    if (displayName == null && referFallback.length() > 0) {
+                    //displayname可能是空白字符（微信未写入昵称），trim后再判断是否为空
+                    String displayName = referSender.toString().trim();
+                    if (displayName.isEmpty() && referFallback.length() > 0) {
                         //displayname缺失时，用fromusr/chatusr解析发送者名字
                         String wxid = referFallback.toString();
                         ContactRepository repo = RepositoryFactory.get(ContactRepository.class);
                         Contact contact = repo.get(wxid);
                         displayName = contact == null ? wxid : contact.getName();
                     }
-                    mReferSender = displayName;
+                    mReferSender = displayName.isEmpty() ? null : displayName;
                     break;
                 case "content":
                     referCurrent = null;

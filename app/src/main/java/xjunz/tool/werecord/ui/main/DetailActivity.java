@@ -8,6 +8,7 @@ import android.annotation.SuppressLint;
 import android.app.ActivityOptions;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.PopupMenu;
@@ -35,6 +36,7 @@ import xjunz.tool.werecord.ui.message.MessageActivity;
 import xjunz.tool.werecord.ui.message.fragment.dialog.LvBufferEditorDialog;
 import xjunz.tool.werecord.util.RxJavaUtils;
 import xjunz.tool.werecord.util.UiUtils;
+import xjunz.tool.werecord.util.Utils;
 
 public class DetailActivity extends RecycleAwareActivity implements PopupMenu.OnMenuItemClickListener {
     public static final String EXTRA_CONTACT = "DetailActivity.extra.contact";
@@ -67,6 +69,19 @@ public class DetailActivity extends RecycleAwareActivity implements PopupMenu.On
                 binding.setTalker((Talker) mData);
             }
             initPopupMenu(binding.ibMore, isTalker);
+            //点击昵称/备注直接复制完整内容（长昵称被省略时）
+            binding.tvNickname.setOnClickListener(v -> {
+                if (!TextUtils.isEmpty(mData.nickname)) {
+                    Utils.copyPlainText("nickname", mData.nickname);
+                    MasterToast.shortToast(R.string.has_copied_to_clipboard);
+                }
+            });
+            binding.tvRemark.setOnClickListener(v -> {
+                if (!TextUtils.isEmpty(mData.remark)) {
+                    Utils.copyPlainText("remark", mData.remark);
+                    MasterToast.shortToast(R.string.has_copied_to_clipboard);
+                }
+            });
         } else {
             UiUtils.gone(binding.ibMore);
         }
