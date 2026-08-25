@@ -120,6 +120,54 @@ public class MessageImageLoader {
     }
 
     /**
+     * root find 兜底：按md5前缀在image2目录搜索原图文件（候选路径构造失败时使用）。
+     * 返回第一个可解码文件的私有副本路径，未找到返回null。
+     */
+    @Nullable
+    public static String findOriginalByMd5(@Nullable String[] md5s) {
+        if (md5s == null) {
+            return null;
+        }
+        User user = Environment.getInstance().getCurrentUser();
+        if (user == null) {
+            return null;
+        }
+        for (String md5 : md5s) {
+            if (md5 == null || md5.length() < 4) {
+                continue;
+            }
+            try {
+                CommandResult result = ShellUtils.sudo("find", user.imageCachePath, "-name", md5 + "*", "-type", "f");
+                String stdout = result.getStdout();
+                if (stdout == null) {
+                    continue;
+                }
+                for (String line : stdout.split("\n")) {
+                    String path = line.trim();
+                    if (path.length() == 0) {
+                        continue;
+                    }
+                    String base = path.substring(path.lastIndexOf('/') + 1);
+                    if (base.startsWith("th_")) {
+                        continue; //缩略图，跳过
+                    }
+                    String local = copyToLocal(path);
+                    if (local != null) {
+                        Bitmap bitmap = BitmapFactory.decodeFile(local);
+                        if (bitmap != null) {
+                            LogUtils.debug("findOriginalByMd5 hit: " + path);
+                            return local;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        LogUtils.debug("findOriginalByMd5 all failed");
+        return null;
+    }
+
+    /**
      * 将微信缓存中的媒体文件复制到应用私有目录，返回本地副本路径（供播放/查看使用）。
      * 复制失败返回null。
      */
@@ -138,9 +186,11 @@ public class MessageImageLoader {
             try {
                 ShellUtils.cp2dataIfExists(path, backupPath, false);
             } catch (IOException | ShellUtils.ShellException e) {
+                LogUtils.debug("copyToLocal exception: " + path + " -> " + e);
                 return null;
             }
         }
+        LogUtils.debug("copyToLocal: " + path + " -> " + backupPath + " exists=" + backup.exists());
         return backup.exists() ? backupPath : null;
     }
 
@@ -159,10 +209,15 @@ public class MessageImageLoader {
                 //跳过无法解码的文件（如加密表情、视频文件本身）
                 Bitmap bitmap = BitmapFactory.decodeFile(local);
                 if (bitmap != null) {
+                    LogUtils.debug("copyFirstToLocal hit: " + path);
                     return local;
                 }
+                LogUtils.debug("copyFirstToLocal undecodable: " + path);
+            } else {
+                LogUtils.debug("copyFirstToLocal missing: " + path);
             }
         }
+        LogUtils.debug("copyFirstToLocal all failed, " + paths.length + " candidates");
         return null;
     }
 

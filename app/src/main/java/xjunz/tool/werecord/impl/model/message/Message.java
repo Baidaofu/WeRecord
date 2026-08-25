@@ -33,6 +33,7 @@ import xjunz.tool.werecord.impl.repo.ContactRepository;
 import xjunz.tool.werecord.impl.repo.GroupRepository;
 import xjunz.tool.werecord.impl.repo.RepositoryFactory;
 import xjunz.tool.werecord.util.DbUtils;
+import xjunz.tool.werecord.util.LogUtils;
 import xjunz.tool.werecord.util.Utils;
 
 import net.sqlcipher.Cursor;
@@ -540,6 +541,105 @@ public abstract class Message implements Parcelable, Exportable {
             //查询失败时忽略，返回null走其他候选
         }
         return null;
+    }
+
+    /**
+     * 从ImgInfo2表按msgSvrId查询原图文件名（bigImgPath），
+     * 返回其中的md5；无记录/未下载(SERVERID占位)返回null。
+     */
+    @Nullable
+    private String queryImgInfo2BigImgPathMd5() {
+        Long msgSvrId = values.getAsLong("msgSvrId");
+        if (msgSvrId == null) {
+            return null;
+        }
+        try {
+            SQLiteDatabase db = Environment.getInstance().getWorkerDatabase();
+            if (db == null || !db.isOpen()) {
+                return null;
+            }
+            try (Cursor cursor = db.rawQuery("SELECT bigImgPath FROM ImgInfo2 WHERE msgSvrId=" + msgSvrId + " LIMIT 1", null)) {
+                if (cursor.moveToFirst()) {
+                    String big = cursor.getString(0);
+                    if (big != null && !big.startsWith("SERVERID://")) {
+                        Matcher matcher = Pattern.compile(".*([0-9a-fA-F]{32})").matcher(big);
+                        if (matcher.find()) {
+                            return matcher.group(1);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            //查询失败时忽略，返回null走其他候选
+        }
+        return null;
+    }
+
+    /**
+     * 原图候选缓存路径列表（供“加载原图”使用）：
+     * 优先ImgInfo2.bigImgPath中的原图md5，其次缩略图md5与content md5（新版微信多数共用同一md5）。
+     */
+    @NonNull
+    public String[] getOriginalImageCandidatePaths() {
+        List<String> candidates = new ArrayList<>();
+        User user = getCurrentUser();
+        if (user != null) {
+            String bigMd5 = queryImgInfo2BigImgPathMd5();
+            if (bigMd5 != null) {
+                addOriginalCandidates(candidates, user, bigMd5);
+            }
+            String thumbMd5 = queryImgInfo2ThumbMd5();
+            if (thumbMd5 != null) {
+                addOriginalCandidates(candidates, user, thumbMd5);
+            }
+            String contentMd5 = extractMediaMd5FromContent();
+            if (contentMd5 != null) {
+                addOriginalCandidates(candidates, user, contentMd5);
+            }
+            LogUtils.debug("orig candidates msgSvrId=" + values.getAsLong("msgSvrId")
+                    + " big=" + bigMd5 + " thumb=" + thumbMd5 + " content=" + contentMd5
+                    + " -> " + candidates.size() + " paths");
+        }
+        return candidates.toArray(new String[0]);
+    }
+
+    /**
+     * 图片相关md5集合（big原图/thumb缩略图/content消息方/msgImgPath字段），供find兜底搜索使用。
+     */
+    @NonNull
+    public String[] getImageMd5Candidates() {
+        java.util.LinkedHashSet<String> set = new java.util.LinkedHashSet<>();
+        String big = queryImgInfo2BigImgPathMd5();
+        if (big != null) {
+            set.add(big);
+        }
+        String thumb = queryImgInfo2ThumbMd5();
+        if (thumb != null) {
+            set.add(thumb);
+        }
+        String content = extractMediaMd5FromContent();
+        if (content != null) {
+            set.add(content);
+        }
+        String imgPathMd5 = extractMd5FromImagePath(getImgPath());
+        if (imgPathMd5 != null) {
+            set.add(imgPathMd5);
+        }
+        return set.toArray(new String[0]);
+    }
+
+    /**
+     * 为给定md5生成原图候选路径（仅image2原图变体，不含th_/hd缩略图前缀）
+     */
+    private static void addOriginalCandidates(@NonNull List<String> candidates, @NonNull User user, @Nullable String md5) {
+        if (md5 == null || md5.length() < 4) {
+            return;
+        }
+        String base = user.imageCachePath + File.separator + md5.substring(0, 2) + File.separator + md5.substring(2, 4);
+        candidates.add(base + File.separator + md5 + ".jpg");
+        candidates.add(base + File.separator + md5 + ".png");
+        candidates.add(base + File.separator + md5);
+        candidates.add(base + File.separator + md5 + "_tmp.jpg");
     }
 
     private static final Pattern IMG_MD5_PATTERN = Pattern.compile("md5=\"([0-9a-fA-F]{32})\"");

@@ -1,5 +1,6 @@
 # WeRecord
 AKA **微记录**，是一款本地微信辅助安卓应用程序。支持安卓6.0及以上。
+
 ## 目前支持
 ### v1.0
 >+ 导出聊天记录、联系人、解密后的完整数据库
@@ -12,10 +13,45 @@ AKA **微记录**，是一款本地微信辅助安卓应用程序。支持安卓
 >+ 批量隐藏、显示聊天
 >+ 批量删除聊天记录
 >+ 更多功能开发中...
-## 应用截图
-![截图1](https://github.com/xjunz/WeRecord/blob/data-binding/app/art/screenshots/Screenshot_20210222-055259.png)
-![截图2](https://github.com/xjunz/WeRecord/blob/data-binding/app/art/screenshots/Screenshot_20210222-055535.png)
-![截图3](https://github.com/xjunz/WeRecord/blob/data-binding/app/art/screenshots/Screenshot_20210222-055659.png)
-![截图4](https://github.com/xjunz/WeRecord/blob/data-binding/app/art/screenshots/Screenshot_20210222-055709.png)
+
+## 相对原版的适配与优化
+
+本分支基于官方归档版进行持续适配与维护，主要针对新版微信（8.0.69 / Android 11+ 分区存储）的数据格式变化做了大量兼容修复，并增加了一系列交互优化。
+
+### 新版微信兼容适配
+- **构建适配**：jcenter 下线后改用阿里云镜像与 mavenCentral；适配 JDK 11 构建环境；内置 GitHub Actions 自动构建，随时产出可安装的 debug APK
+- **拍一拍消息**：识别并正确渲染新版拍一拍通知消息
+- **回复消息**：解析新版回复消息结构，正确显示被引用内容与引用者
+- **撤回消息**：识别撤回消息并显示相应提示
+- **媒体缓存路径**：安卓 11+ 分区存储下，微信媒体缓存位于内部存储，已改为读取微信内部缓存目录
+- **图片缩略图定位**：新版微信缓存文件名 md5 与消息内 md5 不再一致，改为从微信数据库 `ImgInfo2` 表按 `msgSvrId` 查询真实缩略图路径，并覆盖 `th_`/`hd`/`_tmp`/`.jpg`/`.png` 等全部命名变体
+- **原图定位**：从 `ImgInfo2.bigImgPath` 字段获取原图真实文件名（新版微信原图与缩略图文件名 md5 不同，99% 的记录两者不一致）
+- **语音时长解析**：兼容新版语音消息 `voicelength` 属性与冒号分隔格式，正确显示秒数
+- **头像加载**：修复新版头像存储路径导致的加载失败
+- **单向好友判定**：限定 `rawType == 3` 时为单向好友，减少误报
+
+### 原图加载（wxgf 私有格式解密）
+- 新增**「加载原图」**功能：图片预览中可手动加载全分辨率原图
+- 发现并解决新版微信原图加密问题：微信将原图以 `wxgf` 私有格式存储（HEVC/H.265 视频帧封装，文件头 `wxgf`），`BitmapFactory` 无法直接解码
+- 新增 `WxgfDecoder`：提取 HEVC 裸流 → 通过 Android `MediaCodec` 硬件解码 → YUV 转 Bitmap，可还原 **1080×2400 全分辨率原图**，与微信内查看效果一致
+- 三级加载链：明文原图（旧版缓存）→ wxgf 硬解（新版加密）→ md5 全目录扫描兜底
+
+### 交互与体验优化
+- **长按才弹操作菜单**：点击消息不再误弹菜单，长按呼出，防误触
+- **媒体查看器**：点击图片/表情/视频/GIF 放大预览，支持双指缩放（0.3x~5x）、单击关闭
+- **视频与 GIF 播放**：视频消息可直接播放，动图以动画形式展示
+- **语音点击播放**：点击语音气泡直接播放（语音需先在微信中播放过、本地已有缓存文件；未缓存的会提示"请先在微信中播放一次"）
+- **昵称显示优化**：气泡/列表/统计/搜索页昵称单行省略；用户信息页昵称与备注限 3 行、点击复制完整内容；修复回复引用块昵称空白导致换行撑高的问题；过长引用昵称自动截断
+- **数据库导出拆分**：支持单独导出联系人、消息、附件表（sqlcipher 独立连接避免冲突）
+- **消息弹窗去重**：修复操作菜单弹出两次的问题
+
+### 界面与功能调整
+- 删除 QQ 反馈跳转、"获取最新版 / 反馈"无效入口、"支持作者"按钮
+- "检查"菜单项由 `USER_DEBUGGABLE` 控制，debug 包默认可见
+
+## 致谢
+- wxgf 图片格式的解密思路参考了 [yansorau/wxgf2jpg](https://github.com/yansorau/wxgf2jpg)（wxgf → JPEG 转换工具，fork 自 chatlog）与 [gackor/wxgf2jpg](https://github.com/gackor/wxgf2jpg)（微信图片解密说明），并在其思路上于 Android 端使用 `MediaCodec` 硬件解码实现还原
+- 本分支基于原作者 [xjunz/WeRecord](https://github.com/xjunz/WeRecord)（已归档）的代码进行适配
+
 # 声明
 **本项目仅供学习交流、演示使用，禁止用于商业用途或非法用途。使用本应用请自行承担风险。**

@@ -31,8 +31,10 @@ import xjunz.tool.werecord.impl.model.message.MessageFactory;
 import xjunz.tool.werecord.ui.base.RecycleAwareActivity;
 import xjunz.tool.werecord.ui.customview.GifImageView;
 import xjunz.tool.werecord.ui.customview.MasterToast;
+import xjunz.tool.werecord.util.LogUtils;
 import xjunz.tool.werecord.util.MessageImageLoader;
 import xjunz.tool.werecord.util.RxJavaUtils;
+import xjunz.tool.werecord.util.WxgfDecoder;
 
 /**
  * 媒体查看器：图片/表情放大预览（支持双指缩放）、视频播放、GIF动图播放。
@@ -42,6 +44,7 @@ public class MediaViewerActivity extends RecycleAwareActivity {
     public static final String EXTRA_MEDIA_PATH = "MediaViewerActivity.extra.path";
     public static final String EXTRA_MSG = "MediaViewerActivity.extra.msg";
     public static final String EXTRA_THUMB = "MediaViewerActivity.extra.thumb";
+    public static final String EXTRA_CANDIDATES = "MediaViewerActivity.extra.candidates";
 
     private ImageView mIvMedia;
     private VideoView mVvVideo;
@@ -60,6 +63,13 @@ public class MediaViewerActivity extends RecycleAwareActivity {
         Intent intent = getIntent();
         Message msg = intent.getParcelableExtra(EXTRA_MSG);
         String thumb = intent.getStringExtra(EXTRA_THUMB);
+        String[] rawCandidates = intent.getStringArrayExtra(EXTRA_CANDIDATES);
+        final String[] candidates;
+        if ((rawCandidates == null || rawCandidates.length == 0) && thumb != null) {
+            candidates = new String[]{thumb};
+        } else {
+            candidates = rawCandidates;
+        }
 
         //单击关闭（用GestureDetector区分点击与缩放，避免缩放后松手误关闭）
         GestureDetector tapDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
@@ -93,68 +103,111 @@ public class MediaViewerActivity extends RecycleAwareActivity {
             tryPlayVideo(msg);
             return;
         }
-        if (thumb != null && new File(thumb).exists()) {
-            if (isGifFile(thumb)) {
-                playGif(thumb);
-            } else {
-                showImage(thumb);
-                //图片：右上角提供"加载原图"按钮（当前显示的是缩略图）
-                setupLoadOriginalButton(msg, thumb);
-            }
+        //图片/表情消息：从候选路径复制缩略图显示，非GIF提供“加载原图”入口
+        if (candidates != null && candidates.length > 0) {
+            RxJavaUtils.maybe(() -> MessageImageLoader.copyFirstToLocal(candidates))
+                    .subscribe(new RxJavaUtils.MaybeObserverAdapter<String>() {
+                        @Override
+                        public void onSuccess(@NotNull String local) {
+                            if (isGifFile(local)) {
+                                playGif(local);
+                            } else {
+                                showImage(local);
+                                //图片：右上角提供"加载原图"按钮（当前显示的是缩略图）
+                                setupLoadOriginalButton(msg);
+                            }
+                        }
+
+                        @Override
+                        public void onComplete() {
+                            finish();
+                        }
+                    });
         } else {
             finish();
         }
     }
 
     /**
-     * 图片加载原图：current是缩略图，从中提取md5，构造原图候选路径（<md5>.jpg/.png）并加载
+     * 加载原图：优先ImgInfo2.bigImgPath中的原图md5（真实原图文件名），
+     * 其次缩略图md5与content md5；复制解码成功后替换显示，失败提示未缓存。
      */
-    private void setupLoadOriginalButton(Message msg, String current) {
-        String md5 = extractMd5FromThumb(current);
-        if (md5 == null) {
+    private void setupLoadOriginalButton(@Nullable Message msg) {
+        if (msg == null) {
             return;
         }
         Button btn = findViewById(R.id.btn_original);
         btn.setVisibility(android.view.View.VISIBLE);
         btn.setOnClickListener(v -> {
-            User user = Environment.getInstance().getCurrentUser();
-            if (user == null) {
+            final String[] original = msg.getOriginalImageCandidatePaths();
+            LogUtils.debug("load original clicked, candidates=" + original.length);
+            if (original.length == 0) {
+                MasterToast.shortToast("原图未缓存，无法加载");
                 return;
             }
-            String base = user.imageCachePath + File.separator + md5.substring(0, 2) + File.separator + md5.substring(2, 4);
-            List<String> candidates = new ArrayList<>();
-            candidates.add(base + File.separator + md5 + ".jpg");
-            candidates.add(base + File.separator + md5 + ".png");
-            candidates.add(base + File.separator + md5);
-            //从消息图库路径的md5也构造一份候选（原图可能在另一组目录）
-            String imgMd5 = extractMediaMd5FromContent(msg);
-            if (imgMd5 != null && !imgMd5.equals(md5)) {
-                String base2 = user.imageCachePath + File.separator + imgMd5.substring(0, 2) + File.separator + imgMd5.substring(2, 4);
-                candidates.add(base2 + File.separator + imgMd5 + ".jpg");
-                candidates.add(base2 + File.separator + imgMd5 + ".png");
-                candidates.add(base2 + File.separator + imgMd5);
-            }
             btn.setEnabled(false);
-            String[] arr = candidates.toArray(new String[0]);
-            RxJavaUtils.maybe(() -> MessageImageLoader.copyFirstToLocal(arr))
-                    .subscribe(new RxJavaUtils.MaybeObserverAdapter<String>() {
+            RxJavaUtils.maybe(() -> {
+                //1. 明文图片候选（传统jpg/png）
+                String local = MessageImageLoader.copyFirstToLocal(original);
+                if (local != null) {
+                    try {
+                        Bitmap b = BitmapFactory.decodeFile(local);
+                        if (b != null) {
+                            return new Object[]{b, "plain"};
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+                //2. wxgf加密原图（微信新版私有HEVC封装，BitmapFactory无法解码）
+                for (String path : original) {
+                    String p = MessageImageLoader.copyToLocal(path);
+                    if (p == null) {
+                        continue;
+                    }
+                    byte[] bytes = readFile(new File(p));
+                    if (bytes != null && bytes.length > 8 && bytes[0] == 'w' && bytes[1] == 'x' && bytes[2] == 'g' && bytes[3] == 'f') {
+                        Bitmap b = WxgfDecoder.decodeToBitmap(bytes);
+                        if (b != null) {
+                            LogUtils.debug("wxgf decoded original: " + path);
+                            return new Object[]{b, "wxgf"};
+                        }
+                    }
+                }
+                //3. find兜底（扫描image2目录）
+                String found = MessageImageLoader.findOriginalByMd5(msg.getImageMd5Candidates());
+                if (found != null) {
+                    try {
+                        Bitmap b = BitmapFactory.decodeFile(found);
+                        if (b != null) {
+                            return new Object[]{b, "find"};
+                        }
+                    } catch (Exception ignored) {
+                    }
+                    byte[] bytes = readFile(new File(found));
+                    if (bytes != null && bytes.length > 8 && bytes[0] == 'w' && bytes[1] == 'x' && bytes[2] == 'g' && bytes[3] == 'f') {
+                        Bitmap b = WxgfDecoder.decodeToBitmap(bytes);
+                        if (b != null) {
+                            LogUtils.debug("wxgf decoded(find): " + found);
+                            return new Object[]{b, "wxgf-find"};
+                        }
+                    }
+                }
+                return null;
+            }).subscribe(new RxJavaUtils.MaybeObserverAdapter<Object[]>() {
                         @Override
-                        public void onSuccess(@NotNull String original) {
-                            Bitmap bmp = BitmapFactory.decodeFile(original);
-                            if (bmp != null) {
-                                mGifView.setVisibility(android.view.View.GONE);
-                                mVvVideo.setVisibility(android.view.View.GONE);
-                                mIvMedia.setVisibility(android.view.View.VISIBLE);
-                                mIvMedia.setImageBitmap(bmp);
-                                btn.setVisibility(android.view.View.GONE);
-                            } else {
-                                btn.setEnabled(true);
-                                MasterToast.shortToast("原图未缓存，无法加载");
-                            }
+                        public void onSuccess(@NotNull Object[] result) {
+                            Bitmap bmp = (Bitmap) result[0];
+                            LogUtils.debug("load original success: " + result[1]);
+                            mGifView.setVisibility(android.view.View.GONE);
+                            mVvVideo.setVisibility(android.view.View.GONE);
+                            mIvMedia.setVisibility(android.view.View.VISIBLE);
+                            mIvMedia.setImageBitmap(bmp);
+                            btn.setVisibility(android.view.View.GONE);
                         }
 
                         @Override
                         public void onComplete() {
+                            LogUtils.debug("load original failed: no candidate");
                             btn.setEnabled(true);
                             MasterToast.shortToast("原图未缓存，无法加载");
                         }
@@ -162,28 +215,24 @@ public class MediaViewerActivity extends RecycleAwareActivity {
         });
     }
 
-    /**
-     * 从缩略图路径提取md5（最后一段32hex），原图与缩略图共用同一md5（th_前缀区分）
-     */
-    @Nullable
-    private String extractMd5FromThumb(String path) {
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("([0-9a-fA-F]{32})").matcher(path);
-        String md5 = null;
-        while (m.find()) {
-            md5 = m.group(1);
-        }
-        return md5;
-    }
-
-    private String extractMediaMd5FromContent(Message msg) {
-        if (msg == null) {
+    private static byte[] readFile(@Nullable File file) {
+        if (file == null || !file.exists()) {
             return null;
         }
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^[a-zA-Z0-9]+:.*?([0-9a-fA-F]{32})").matcher(String.valueOf(msg.getContent()));
-        if (m.find()) {
-            return m.group(1);
+        try (FileInputStream fis = new FileInputStream(file)) {
+            byte[] data = new byte[(int) file.length()];
+            int off = 0;
+            while (off < data.length) {
+                int r = fis.read(data, off, data.length - off);
+                if (r < 0) {
+                    break;
+                }
+                off += r;
+            }
+            return off == data.length ? data : null;
+        } catch (Exception e) {
+            return null;
         }
-        return null;
     }
 
     @Override

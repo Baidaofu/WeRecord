@@ -80,6 +80,7 @@ public class UniversalBindingAdapter {
                                     Intent intent = new Intent(v.getContext(), MediaViewerActivity.class);
                                     intent.putExtra(MediaViewerActivity.EXTRA_MSG, message);
                                     intent.putExtra(MediaViewerActivity.EXTRA_THUMB, localPath);
+                                    intent.putExtra(MediaViewerActivity.EXTRA_CANDIDATES, paths);
                                     v.getContext().startActivity(intent);
                                 });
                             } else {
